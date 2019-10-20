@@ -1,10 +1,8 @@
 import re
-import os
 import json
 import math
 import json
 import datetime
-from urllib.parse import urlsplit
 
 import pymongo
 import gridfs
@@ -16,6 +14,7 @@ import config
 logger = logging.getLogger(__name__)
 
 db = pymongo.MongoClient(**config.mongo_kwargs)[config.mongo_db_name]
+fs = gridfs.GridFS(db)
 
 session = FuturesSession(adapter_kwargs={'max_retries': 3})
 
@@ -66,32 +65,6 @@ def reset_statistics():
     logger.warning('last statistics: %s', get_statistics())
     task_statistics = {'total': 0, 'done': 0, 'success': 0}
 
-def make_file_name(url):
-    target = os.path.realpath(urlsplit(url).path)
-    if not target.startswith('/'):
-        target = '/' + target
-    return os.path.realpath(config.storage_dir + target)
-    
-def save_file(path, data, warning=False, overwrite=False):
-    """尝试将data存储到path
-    """
-    if os.path.exists(path):
-        if warning:
-            log_func = logger.warning
-        else:
-            log_func = logger.debug
-        if overwrite:
-            log_func('Overwrite existing file %s', path)
-        else:
-            log_func('Skip existing file %s', path)
-            return
-    dirpath = os.path.dirname(path)
-    if not os.path.exists(dirpath):
-        os.makedirs(dirpath)
-    with open(path, 'wb') as fl:
-        fl.write(data)
-    return path
-
 def update_search(response, *args, **kwargs):
     """处理搜索结果"""
     try:
@@ -126,7 +99,7 @@ def try_update_illust(illust, update_time):
     except Exception as e:
         logger.exception("try_update_illust failed for %s: %s", illust, e)
 
-def handle_detail(response, pid, *args, **kwargs):
+def update_detail(response, pid, *args, **kwargs):
     """处理详情信息"""
     try:
         now = datetime.datetime.now()
@@ -164,7 +137,7 @@ def handle_detail(response, pid, *args, **kwargs):
         response.handler_error = e
         logger.exception("update_detail failed for %s(%s): %s", pid, response.url, e)
 
-def handle_anime_info(response, pid, *args, **kwargs):
+def update_ugoira_meta(response, pid, *args, **kwargs):
     """处理动画信息"""
     try:
         logger.debug('update_ugoira_meta for %s start', pid)
@@ -183,15 +156,20 @@ def handle_anime_info(response, pid, *args, **kwargs):
         response.handler_error = e
         logger.exception("update_ugoira_meta failed for %s(%s): %s", pid, response.url, e)
 
-def handle_illust(response, pid, index, **kwargs):
+def save_illust(response, pid, index, **kwargs):
     """保存文件"""
     try:
         logger.debug('save_illust for %s start', pid)
         info = {'illustId': pid, 'pageIndex': index, 'fileType': 'illust'}
         url = response.url
-        path = make_file_name(url)
-        save_file(path, response.content)
-        info = {'url': url, 'pageIndex': index, 'path': path}
+        
+        if fs.exists(filename=url):
+            file_id = fs.get_last_version(filename=url)._id
+            logger.warning('ignore existing file: %s(%s)', pid, url)
+        else:
+            file_id = fs.put(filename=url, data=response.content, metadata=info)
+
+        info = {'filename': url, 'pageIndex': index, 'fileId': file_id}
         res = db.illust.update_one(
             {'illustId': pid, 'files': {'$not': {'$elemMatch': {'pageIndex': index}}}}, 
             {'$push': {
@@ -209,28 +187,32 @@ def handle_illust(response, pid, index, **kwargs):
         response.handler_error = e
         logger.exception("save_illust failed for %s(%s): %s", pid, response.url, e)
 
-def handle_file(response, pid, **kwargs):
+def save_file(response, pid, **kwargs):
     """保存文件"""
     try:
-        logger.debug('handle_file for %s start', pid)
+        logger.debug('save_file for %s start', pid)
         info = {'illustId': pid, 'fileType': 'frames'}
         url = response.url
-        path = make_file_name(url)
-        save_file(path, response.content)
-        info = {'url': url, 'path': path}
+        if fs.exists(filename=url):
+            file_id = fs.get_last_version(filename=url)._id
+            logger.warning('ignore existing file: %s(%s)', pid, url)
+        else:
+            file_id = fs.put(filename=url, data=response.content, metadata=info)
+
+        info = {'filename': url, 'fileId': file_id}
         res = db.illust.update_one(
             {'illustId': pid}, 
             {'$set': {
                 'frameInfo.file': info
             }})
         response.handler_error = None
-        logger.debug('handle_file for %s succeed', pid)
+        logger.debug('save_file for %s succeed', pid)
     except Exception as e:
         response.handler_error = e
-        logger.exception("handle_file failed for %s(%s): %s", pid, response.url, e)
+        logger.exception("save_file failed for %s(%s): %s", pid, response.url, e)
 
 
-def crawl_by_search(params, skip_exists=True, page_limit=1000):
+def crawl_by_search(params, skip_exists=True):
     # 第一页
     logger.debug("start crawl_by_search of fisrt page for %s", params)
     future = send_request(
@@ -269,29 +251,29 @@ def crawl_by_search(params, skip_exists=True, page_limit=1000):
             compare_cond += [{'tags': {'$eq': 'R-18'}}]
         else:
             compare_cond += [{'tags': {'$ne': 'R-18'}}]
-
+    
     if 'wlt' in params:
         compare_cond += [{'width': {'$gte': params['wlt']}}]
-    if 'hlt' in params:
-        compare_cond += [{'height': {'$gte': params['hlt']}}]
     if 'wgt' in params:
         compare_cond += [{'width': {'$lte': params['wgt']}}]
+    if 'hlt' in params:
+        compare_cond += [{'width': {'$gte': params['hlt']}}]
     if 'hgt' in params:
-        compare_cond += [{'height': {'$lte': params['hgt']}}]
-
+        compare_cond += [{'width': {'$lte': params['hgt']}}]
+    
     local_count = db.illust.count_documents({'$and': compare_cond})
     logger.info("found %s pictures in database for cond %s", local_count, compare_cond)
-
+    
     if skip_exists:
         n_pics_more = n_pics - local_count
     else:
         n_pics_more = n_pics
 
-    n_pages_more = min(math.ceil(n_pics_more / 40), page_limit, 1000)
+    n_pages_more = math.ceil(n_pics_more / 40)
     logger.info("will crawl %s pages for %s more pictures", n_pages_more, n_pics_more)
 
     # 其余页
-    for i in range(2, n_pages_more+1):
+    for i in range(2, min(n_pages_more+1, 1001)):
         p = params.copy()
         p['p'] = i
         r = send_request(
@@ -376,8 +358,7 @@ def crawl_anime_info():
 def download_illust(p):
     for i in range(p['pageCount']):
         url = p['imageUrlFormat'].format(pageIndex=i)
-        path = make_file_name(url)
-        if os.path.exists(path):
+        if fs.exists(filename=url):
             continue
         r = send_request(
             'GET', url.replace('i.pximg.net', '210.140.92.140:443'),
@@ -397,8 +378,7 @@ def download_illust(p):
 
 def download_ugoira(p):
     url = p['frameInfo']['originalSrc']
-    path = make_file_name(url)
-    if os.path.exists(path):
+    if fs.exists(filename=url):
         return
     r = send_request(
         'GET', url.replace('i.pximg.net', '210.140.92.140:443'),
