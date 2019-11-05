@@ -212,7 +212,7 @@ def save_file(response, pid, **kwargs):
         logger.exception("save_file failed for %s(%s): %s", pid, response.url, e)
 
 
-def crawl_by_search(params, skip_exists=True):
+def crawl_by_search(params, skip_exists=True, page_limit=100):
     # 第一页
     logger.debug("start crawl_by_search of fisrt page for %s", params)
     future = send_request(
@@ -232,7 +232,7 @@ def crawl_by_search(params, skip_exists=True):
     n_pages = math.ceil(n_pics / 40)
     logger.info("found %s pictures, in %s pages", n_pics, n_pages)
     
-    compare_cond = []
+    compare_cond = [{'detail.error': {'$exists': 0}}]
     if params.get('s_mode') is None:
         compare_cond += [{'tags': {'$regex': params['word']}}]
     elif params['s_mode'] == 's_tag_full':
@@ -263,17 +263,20 @@ def crawl_by_search(params, skip_exists=True):
     
     local_count = db.illust.count_documents({'$and': compare_cond})
     logger.info("found %s pictures in database for cond %s", local_count, compare_cond)
-    
+
     if skip_exists:
         n_pics_more = n_pics - local_count
     else:
         n_pics_more = n_pics
 
-    n_pages_more = math.ceil(n_pics_more / 40)
+    n_pages_more = min(math.ceil(n_pics_more / 40), page_limit, 1000) - 1
+    if n_pages_more < 0:
+        n_pages_more = 0
+    n_pics_more = min(n_pics_more, n_pages_more * 40)
     logger.info("will crawl %s pages for %s more pictures", n_pages_more, n_pics_more)
 
     # 其余页
-    for i in range(2, min(n_pages_more+1, 1001)):
+    for i in range(2, n_pages_more + 2):
         p = params.copy()
         p['p'] = i
         r = send_request(
@@ -399,6 +402,7 @@ def download_ugoira(p):
 def crawl_illust_file(limit=100):
     # 下载图片
     n = next(db.illust.aggregate([
+        {"$match":{"bookmarkCount": {'$gte': config.illust_min_bookmarks}}},
         {"$addFields": {
             "countMatch": {"$eq":["$pageCount","$fileCount"]}
         }},
@@ -407,19 +411,24 @@ def crawl_illust_file(limit=100):
     ]))['n']
     logger.info("crawl_illust_file of %s in %s illusts", limit, n)
     for p in db.illust.aggregate([
+        {"$match":{"bookmarkCount": {'$gte': config.illust_min_bookmarks}}},
         {"$addFields": {
             "countMatch": {"$eq":["$pageCount","$fileCount"]}
         }},
         {"$match":{"countMatch": False}},
-        {'$project': {'illustId': 1, 'illustTitle': 1, 'detail.likeCount': 1, 'imageUrlFormat': 1, 'pageCount': 1, 'bookmarkCount': 1}},
-        {'$sort': {'detail.likeCount': -1}}, # 按like数降序排列
-        {'$limit': limit} # 取排序靠前的部分图片
+        {'$project': {'illustId': 1, 'illustTitle': 1, 'imageUrlFormat': 1, 'pageCount': 1, 'bookmarkCount': 1}},
+        {'$sort': {'bookmarkCount': -1}}, # 按收藏数降序排列
+        {'$limit': limit} # 取前limit张图片
     ]):
         download_illust(p)
         logger.debug("start crawl_illust for %s", p['illustId'])
 
 def crawl_anime_file(limit=100):
-    cond = {'frameInfo.originalSrc': {'$exists': 1}, 'frameInfo.file': {'$exists': 0}}
+    cond = {
+        'bookmarkCount': {'$gte': config.anime_min_bookmarks}, 
+        'frameInfo.originalSrc': {'$exists': 1}, 
+        'frameInfo.file': {'$exists': 0}
+    }
     n = db.illust.count_documents(cond)
     logger.info("crawl_anime_file of %s in %s illusts for condition: %s", n, n, cond)
 
