@@ -1,0 +1,144 @@
+<html>
+    <head>
+        <meta charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Local Pixiv Viewer</title>
+        <style>
+            img{
+                height: auto;
+                max-height: 800px;
+                min-width: 90%;
+                max-width: 100%;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="output">
+        </div>
+        <button onclick="previous()">上一个</button><button onclick="next()">下一个</button>
+        <script>
+            var illustIds = {{ illust|safe }};
+            var idx = {{idx}};
+            function loadIllust(){
+                var out = document.getElementById("output");
+                out.innerHTML = 'Loading';
+                var illust = illustIds[idx];
+                if(!illust){
+                    out.innerHTML = 'Load failed';
+                    return
+                }
+                
+                var desc = '';
+                if(illust.detail.description){
+                    desc = `<hr>${illust.detail.description}<hr>`;
+                }
+                var tagHtml = '';
+                 for(var tag of illust.detail.tags.tags ){
+                     tagHtml += '<span style="background: #6cf">';
+                     if(tag.translation){
+                         tagHtml += `&nbsp;&nbsp;<span style="color: #333">${tag.translation.en}</span>`;
+                     }
+                     tagHtml += `</span> &nbsp;&nbsp;`;
+                 }
+
+                out.innerHTML = `
+    <div id="illust"><br></div>
+    <h2>${idx+1}.<a href="https://www.pixiv.net/artworks/${illust.illustId}">${illust.illustTitle}</a></h2>
+    (pid=${illust.illustId},uid=${illust.userId}) <a href="https://www.pixiv.net/member.php?id=${illust.userId}">${illust.userName}</a>
+    &nbsp;${illust.detail.createDate}
+    ${desc}
+    ${tagHtml}
+    <br>
+${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail.likeCount} likes;
+    size=${illust.width}x${illust.height}<br>
+    <br>
+        <button onclick="previous()">上一个</button><button onclick="next()">下一个</button>`;
+                for(var i=0; i < illust.pageCount; ++i){
+                    out.innerHTML += `<img src="/pixiv/image?illustId=${illust.illustId}&pageIndex=${i}" alt="${illust.illustId}:${i+1}/${illust.pageCount}" width=${illust.width} height=${illust.height}/><br/>`;
+                }
+            }
+            function showAnime(illust){
+                var animes = {};
+                function display(illust){
+                    animes[illust.id] = (function(){
+                    var frames = [];
+                    for(var i=0;i<frameData.length;++i){
+                        var img = new Image();
+                        img.src = frameData[i].src;
+                        frames.push({img: img, delay: frameData[i].delay});
+                    }
+                    frames[0]["img"].onload = updateFrame;
+
+                    var cvs = document.getElementById("canvas-{{ disp_id }}");
+                    var ctx = cvs.getContext("2d");
+                    var info = document.getElementById("info-{{ disp_id }}");
+
+                    var running = {% if auto %}1{% else %}2{% endif %};
+                    var frameIndex = 0;
+                    function updateFrame(){
+                        if(document.getElementById("canvas-{{ disp_id }}")){
+                            setTimeout(updateFrame, frames[frameIndex].delay);
+                        } else {
+                            animes["{{ disp_id }}"] = null;
+                            delete animes["{{ disp_id }}"];
+                            console.log("Stopped {{ disp_id }}");
+                            return;
+                        }
+
+                        if(running === 0){
+                            return;
+                        }
+                        if(running === 2){
+                            running = 0;
+                        }
+                        var img = frames[frameIndex].img;
+                        if(img.width && cvs.width !== img.width) cvs.width = img.width;
+                        if(img.height && cvs.height !== img.height) cvs.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        info.innerText = `${frameIndex}: ${frames[frameIndex].delay}`;
+
+                        ++frameIndex;
+                        if(frameIndex>=frames.length){
+                            frameIndex = 0;
+                        }
+                    }
+                    function toggle(obj){
+                        if(running === 1){
+                            running = 0;
+                            obj.innerText = "Play";
+                        } else if (running === 0){
+                            running = 1;
+                            obj.innerText = "Pause";
+                        } else {
+                            alert(`Running is invalid: ${running}`)
+                        }
+                    }
+                    function next(){
+                        if(running === 1){
+                            alert("Need pause before it!")
+                            return;
+                        }
+                        running = 2;
+                    }
+                    return {
+                        toggle: toggle,
+                        next: next,
+                    }
+                })();
+                }
+            }
+            loadIllust()
+            function next(){
+                idx ++;
+                loadIllust();
+            }
+            function previous(){
+                idx --;
+                loadIllust();
+            }
+            function onImageClick(){
+                
+            }
+        </script>
+    </body>
+</html>

@@ -1,0 +1,30 @@
+<html>
+    <head>
+        <meta charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Local Pixiv Viewer</title>
+    </head>
+    <body>
+        <form id="mainForm" action="illust" onsubmit="checkForm()">
+            <textarea name="match" form="mainForm">{}</textarea>
+            <br>
+            <label for="idx">Init Page Index</label>
+            <input name="idx" type="number" value="0"/>
+            <br>
+            <input type="submit">
+        </form>
+        <script>
+        function checkForm(){
+            var text = document.getElementsByName("match")[0].value;
+            try {
+                var json = JSON.parse(text);
+            }
+            catch(err) {
+                alert(err)
+               return false; 
+            }
+            return true;
+        }
+        </script>
+    </body>
+</html>
