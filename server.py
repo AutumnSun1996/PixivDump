@@ -12,13 +12,13 @@ import gridfs
 import logging
 import json
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('server')
 
 db = pymongo.MongoClient(**config.mongo_kwargs)[config.mongo_db_name]
 fs = gridfs.GridFS(db)
 
 app = Flask(__name__);
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 def default(obj):
     if isinstance(obj, datetime.datetime):
@@ -38,7 +38,6 @@ def to_json(obj):
 def index():
     return render_template("index.html")
 
-
 @app.route("/pixiv/image")
 def image():
     illust_id = request.values.get('illustId')
@@ -47,7 +46,6 @@ def image():
     idx = int(request.values.get('pageIndex', 0))
     cond = {'metadata.illustId': illust_id, 'metadata.pageIndex': idx}
     f = fs.find_one(cond)
-    print(cond, f)
     if f is None:
         return 'illust not found', 404
     mimetype = mimetypes.guess_type(f.filename)[0]
@@ -94,7 +92,6 @@ def illust():
         match, 
         {'_id': 0}
     ).sort([('bookmarkCount', -1)]).limit(limit))
-    print(result)
     return render_template("illust.html", illust=to_json(result), idx=idx, count=len(result))
 
 if __name__ == "__main__":
@@ -102,5 +99,5 @@ if __name__ == "__main__":
         app.run(config.app_host, config.app_port, debug=True)
     else:
         from gevent.pywsgi import WSGIServer
-        http_server = WSGIServer((config.app_host, config.app_port), app)
+        http_server = WSGIServer((config.app_host, config.app_port), app, log=logger)
         http_server.serve_forever()
