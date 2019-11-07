@@ -12,6 +12,14 @@ import gridfs
 import logging
 import json
 
+app_host = '0.0.0.0'
+app_port = 10101
+app_debug = False
+
+if not app_debug:
+    from gevent import monkey
+    monkey.patch_all()
+
 logger = logging.getLogger('server')
 
 db = pymongo.MongoClient(**config.mongo_kwargs)[config.mongo_db_name]
@@ -95,9 +103,9 @@ def illust():
     return render_template("illust.html", illust=to_json(result), idx=idx, count=len(result))
 
 if __name__ == "__main__":
-    if config.app_debug:
-        app.run(config.app_host, config.app_port, debug=True)
+    if app_debug:
+        app.run(app_host, app_port, debug=True)
     else:
         from gevent.pywsgi import WSGIServer
-        http_server = WSGIServer((config.app_host, config.app_port), app, log=logger)
+        http_server = WSGIServer((app_host, app_port), app, log=logger)
         http_server.serve_forever()
