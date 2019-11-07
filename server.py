@@ -1,5 +1,7 @@
-from flask import Flask, request, render_template, Response, jsonify, redirect, url_for
+import config
 
+from flask import Flask, request, render_template, Response, Request, jsonify, redirect, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 import json
 import io
 from bson import ObjectId
@@ -10,14 +12,13 @@ import gridfs
 import logging
 import json
 
-import config
 logger = logging.getLogger(__name__)
 
 db = pymongo.MongoClient(**config.mongo_kwargs)[config.mongo_db_name]
 fs = gridfs.GridFS(db)
 
-
 app = Flask(__name__);
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 def default(obj):
     if isinstance(obj, datetime.datetime):
@@ -97,11 +98,9 @@ def illust():
     return render_template("illust.html", illust=to_json(result), idx=idx, count=len(result))
 
 if __name__ == "__main__":
-    if True:
-        app.run('0.0.0.0', 10101, debug=True)
+    if config.app_debug:
+        app.run(config.app_host, config.app_port, debug=True)
     else:
-        from gevent import monkey
-        monkey.patch_all()
         from gevent.pywsgi import WSGIServer
-        http_server = WSGIServer(('0.0.0.0', 10101), app)
+        http_server = WSGIServer((config.app_host, config.app_port), app)
         http_server.serve_forever()
