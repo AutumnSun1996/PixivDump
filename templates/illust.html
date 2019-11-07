@@ -6,8 +6,9 @@
         <style>
             img, canvas {
                 height: auto;
+                min-height: 10%;
                 max-height: 100%;
-                min-width: 50%;
+                min-width: 10%;
                 max-width: 100%;
             }
             #illust-header{
@@ -45,9 +46,10 @@
                  }
 
                 out.innerHTML = `
-<div id="illust"><br></div>
 <h2>${idx+1}.<a href="https://www.pixiv.net/artworks/${illust.illustId}" target="_blank">${illust.illustTitle}</a></h2>
-(pid=${illust.illustId},uid=${illust.userId}) <a href='/pixiv/user/${illust.userId}'>${illust.userName}</a>
+(pid=${illust.illustId},uid=${illust.userId}) <br>
+<a href='/pixiv/'>Home</a><br>
+<a href='/pixiv/user/${illust.userId}'>${illust.userName}</a>
 <br>
 ${idx+1}/${count}
 &nbsp;${illust.detail.createDate}
@@ -56,10 +58,9 @@ ${tagHtml}
 <br>
 size=${illust.width}x${illust.height}<br>
 ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail.likeCount} likes;<br>
-<br>`;
+<br><button onclick="previous()">上一个</button><button onclick="next()">下一个</button><br>`;
             }
             function showIllust(illust, out){
-                out.innerHTML += `<button onclick="previous()">上一个</button><button onclick="next()">下一个</button><br>`;
                 for(var i=0; i < illust.pageCount; ++i){
                     out.innerHTML += `<img src="/pixiv/image?illustId=${illust.illustId}&pageIndex=${i}" alt="${illust.illustId}:${i+1}/${illust.pageCount}" width="${illust.width}" height="${illust.height}"/><br/>`;
                 }
@@ -188,7 +189,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                 }
                 addHeader(illust, header);
                 showIllust(illust, display);
-                if(illust.illustType == '2'){
+                if(illust.illustType == 2 && !!illust.frameInfo.frames){
                     showAnime(illust, display);
                 }
             }
@@ -205,18 +206,57 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                 console.log(event)
             }
             
+            var isFullScreen = false;
+            function toggleFullScreen(){
+                console.log('Toggle isFullScreen', isFullScreen);
+                if(isFullScreen){
+                    exitFullscreen("#illust-display");
+                    isFullScreen = false;
+                } else {
+                    requestFullScreen("#illust-display");
+                    isFullScreen = true;
+                }
+            }
             function keyHandler(event){
                 console.log(event)
-                if(event.code === "ArrowRight"){
+                if(event.key === "ArrowRight"){
                     next();
                     return;
                 }
-                if(event.code === "ArrowLeft"){
+                if(event.key === "ArrowLeft"){
                     previous();
+                    return;
+                }
+                if(event.key === "Enter"){
+                    toggleFullScreen();
                     return;
                 }
             }
             document.addEventListener('keyup', keyHandler)
+            document.addEventListener('dblclick', toggleFullScreen)
+
+        //进入全屏
+        function requestFullScreen(element) {
+            var de = document.querySelector(element) || document.documentElement;
+            if (de.requestFullscreen) {
+                de.requestFullscreen();
+            } else if (de.mozRequestFullScreen) {
+                de.mozRequestFullScreen();
+            } else if (de.webkitRequestFullScreen) {
+                de.webkitRequestFullScreen();
+            }
+        }
+        //退出全屏
+        function exitFullscreen(element) {
+            var de = document.querySelector(element) || document.documentElement;
+            if (de.exitFullscreen) {
+                de.exitFullscreen();
+            } else if (de.mozCancelFullScreen) {
+                de.mozCancelFullScreen();
+            } else if (de.webkitCancelFullScreen) {
+                de.webkitCancelFullScreen();
+            }
+        }
         </script>
     </body>
 </html>
