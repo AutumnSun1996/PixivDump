@@ -243,7 +243,7 @@ def crawl_by_search(params, skip_exists=True, page_limit=100):
         logger.error("invalid s_mode: %s", params['s_mode'])
     
     if 'type' in params:
-        local_key = {'illust': '0', 'manga': '1', 'ugoira': '2'}.get(params['type'])
+        local_key = {'illust': 0, 'manga': 1, 'ugoira': 2}.get(params['type'])
         compare_cond += [{'illustType': {'$eq': local_key}}]
 
     if 'mode' in params:
@@ -337,7 +337,7 @@ def crawl_detail(limit=1000):
 
 def crawl_anime_info():
     # 将动画信息更新到frameInfo
-    cond = {'frameInfo': {'$exists': 0}, 'illustType': '2'}
+    cond = {'frameInfo': {'$exists': 0}, 'illustType': 2}
     n = db.illust.count_documents(cond)
     logger.info("crawl_anime_info of %s in %s illusts for condition: %s", n, n, cond)
 
