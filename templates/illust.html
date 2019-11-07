@@ -61,7 +61,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             function showIllust(illust, out){
                 out.innerHTML += `<button onclick="previous()">上一个</button><button onclick="next()">下一个</button><br>`;
                 for(var i=0; i < illust.pageCount; ++i){
-                    out.innerHTML += `<img src="/pixiv/image?illustId=${illust.illustId}&pageIndex=${i}" alt="${illust.illustId}:${i+1}/${illust.pageCount}" width=${illust.width} height=${illust.height}/><br/>`;
+                    out.innerHTML += `<img src="/pixiv/image?illustId=${illust.illustId}&pageIndex=${i}" alt="${illust.illustId}:${i+1}/${illust.pageCount}" width="${illust.width}" height="${illust.height}"/><br/>`;
                 }
             }
             
@@ -73,8 +73,8 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             var animes = {};
             var loadFrames = function (illust, frames, out){
                 out.innerHTML = `
-                <button onclick="animes['${illust.illustId}'].toggle(this)">Pause</button>
-                <button onclick="animes['${illust.illustId}'].next()">NextFrame</button>
+                <button onclick="animes['${illust.illustId}'].toggle(this)">暂停</button>
+                <button onclick="animes['${illust.illustId}'].next()">下一帧</button>
                 <span id="info-${illust.illustId}"></span>
                 <hr>
                 <canvas id="canvas-${illust.illustId}" width="${illust.width}" height="${illust.height}"></canvas>
@@ -118,17 +118,17 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                 function toggle(obj){
                     if(running === 1){
                         running = 0;
-                        obj.innerText = "Play";
+                        obj.innerText = "播放";
                     } else if (running === 0){
                         running = 1;
-                        obj.innerText = "Pause";
+                        obj.innerText = "暂停";
                     } else {
                         alert(`Running is invalid: ${running}`)
                     }
                 }
                 function next(){
                     if(running === 1){
-                        alert("Need pause before it!")
+                        alert("请先暂停!")
                         return;
                     }
                     running = 2;
@@ -150,16 +150,15 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                 }
                 frames[0].firstFrame = true;
                 
-                fetch(`/pixiv/zipFile?illustId=${illust.illustId}`)         // 1) fetch the url
-                .then(function (response) {                       // 2) filter on 200 OK
+                fetch(`/pixiv/zipFile?illustId=${illust.illustId}`).then(function (response) {
+                    // filter on 200 OK
                     if (response.status === 200 || response.status === 0) {
                         return Promise.resolve(response.blob());
                     } else {
                         return Promise.reject(new Error(response.statusText));
                     }
-                })
-                .then(JSZip.loadAsync)                            // 3) chain with the zip promise
-                .then(function (zip) {
+                }).then(JSZip.loadAsync).then(function (zip) {
+                    // load images as DataURL
                     for(let frame of frames){
                         console.log("load frame", frame)
                         zip.file(frame.name).async('blob').then(function(blob){
@@ -205,7 +204,19 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             function onImageClick(){
                 console.log(event)
             }
-
+            
+            function keyHandler(event){
+                console.log(event)
+                if(event.code === "ArrowRight"){
+                    next();
+                    return;
+                }
+                if(event.code === "ArrowLeft"){
+                    previous();
+                    return;
+                }
+            }
+            document.addEventListener('keyup', keyHandler)
         </script>
     </body>
 </html>
