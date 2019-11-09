@@ -211,7 +211,6 @@ def save_file(response, pid, **kwargs):
         response.handler_error = e
         logger.exception("save_file failed for %s(%s): %s", pid, response.url, e)
 
-
 def crawl_by_search(params, skip_exists=True, page_limit=100):
     # 第一页
     logger.debug("start crawl_by_search of fisrt page for %s", params)
@@ -291,6 +290,20 @@ def crawl_by_search(params, skip_exists=True, page_limit=100):
         )
         logger.debug("start crawl_by_search for %s", p)
 
+def crawl_detail_by_id(illust_id):
+    header = config.HEADERS['detail'].copy()
+    header['Referer'] = 'https://www.pixiv.net/artworks/'+illust_id
+    r = send_request(
+        'GET', 'https://210.140.131.182:443/ajax/illust/'+illust_id,
+        timeout=config.TIMEOUT,
+        verify=False,
+        headers=header,
+        hooks={
+            'response': extra_args(update_detail, pid=illust_id),
+        }
+    )
+    logger.debug("start crawl_detail for %s", illust_id)
+
 def crawl_detail(limit=1000):
     cond = {'detail': {'$exists': 0}}
     n = db.illust.count_documents(cond)
@@ -299,18 +312,7 @@ def crawl_detail(limit=1000):
     for p in db.illust.find(
         cond, {'_id': 0, 'illustId': 1, 'bookmarkCount': 1}
         ).sort('bookmarkCount', pymongo.DESCENDING).limit(limit):
-        header = config.HEADERS['detail'].copy()
-        header['Referer'] = 'https://www.pixiv.net/artworks/'+p['illustId']
-        r = send_request(
-            'GET', 'https://210.140.131.182:443/ajax/illust/'+p['illustId'],
-            timeout=config.TIMEOUT,
-            verify=False,
-            headers=header,
-            hooks={
-                'response': extra_args(update_detail, pid=p['illustId']),
-            }
-        )
-        logger.debug("start crawl_detail for %s", p['illustId'])
+        crawl_detail_by_id(p['illustId'])
     if n >= limit:
         return
     limit -= n
@@ -322,18 +324,7 @@ def crawl_detail(limit=1000):
     for p in db.illust.find(
         cond, {'_id': 0, 'illustId': 1}
         ).sort('updateTime', pymongo.ASCENDING).limit(limit):
-        header = config.HEADERS['detail'].copy()
-        header['Referer'] = 'https://www.pixiv.net/artworks/'+p['illustId']
-        r = send_request(
-            'GET', 'https://210.140.131.182:443/ajax/illust/'+p['illustId'],
-            timeout=config.TIMEOUT,
-            verify=False,
-            headers=header,
-            hooks={
-                'response': extra_args(update_detail, pid=p['illustId']),
-            }
-        )
-        logger.debug("start crawl_detail for %s", p['illustId'])
+        crawl_detail_by_id(p['illustId'])
 
 def crawl_anime_info():
     # 将动画信息更新到frameInfo
