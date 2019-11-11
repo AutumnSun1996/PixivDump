@@ -159,6 +159,7 @@ def update_ugoira_meta(response, pid, *args, **kwargs):
             item['frameInfo'] = info
         else:
             item['frameInfo'] = info['body']
+        item['frameInfo']['updateTime'] = datetime.datetime.now()
         db.illust.update_one({'illustId': pid}, {'$set': item})
         response.handler_error = None
         logger.debug('update_ugoira_meta for %s succeed', pid)
