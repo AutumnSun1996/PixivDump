@@ -3,9 +3,15 @@
         <meta charset="UTF-8"/>
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <title>Local Pixiv Viewer</title>
+        <style>
+            textarea {
+                width: 100%;
+                height: 40%;
+            }
+        </style>
     </head>
     <body>
-        <form id="mainForm" action="illust" onsubmit="checkForm()">
+        <form id="mainForm" action="illust" onsubmit="return checkForm();">
             <textarea name="match" form="mainForm">{}</textarea>
             <br>
             <label for="idx">Init Page Index</label>
@@ -14,13 +20,14 @@
             <input type="submit">
         </form>
         <script>
+            document.getElementsByName("match")[0].value = `{"$and":[\n{"tags":"Fate/GrandOrder"}\n]}`;
         function checkForm(){
             var text = document.getElementsByName("match")[0].value;
             try {
                 var json = JSON.parse(text);
             }
             catch(err) {
-                alert(err)
+               alert(err)
                return false; 
             }
             return true;
