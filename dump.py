@@ -151,7 +151,7 @@ def update_ugoira_meta(response, pid, *args, **kwargs):
     """处理动画信息"""
     try:
         logger.debug('update_ugoira_meta for %s start', pid)
-        item = {'updateTime': datetime.datetime.now()}
+        item = {}
         info = response.json()
         if info['error']:
             if not info['body']:
