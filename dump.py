@@ -79,6 +79,9 @@ def update_search(response, *args, **kwargs):
                 for key in config.key_names['search']:
                     item[key] = origin_item[key]
                 item['updateTime'] = datetime.datetime.now()
+                # 保证illustType为int类型
+                if 'illustType' in item:
+                    item['illustType'] = int(item['illustType'])
                 db.illust.insert_one(item)
             except pymongo.errors.DuplicateKeyError:
                 item.pop("_id")
@@ -95,6 +98,9 @@ def try_update_illust(illust, update_time):
         for key in config.key_names['search']:
             if key in illust:
                 item[key] = illust[key]
+        # 保证illustType为int类型
+        if 'illustType' in item:
+            item['illustType'] = int(item['illustType'])
         item['updateTime'] = update_time
         db.illust.update_one({'illustId': illust['illustId']}, {'$set': item}, upsert=True)
     except Exception as e:
@@ -124,6 +130,9 @@ def update_detail(response, pid, *args, **kwargs):
             url = origin_item['urls']['original']
             idx = url.rfind('.')
             item['imageUrlFormat'] = url[:idx-1] + "{pageIndex}" + url[idx:]
+            # 保证illustType为int类型
+            if 'illustType' in item:
+                item['illustType'] = int(item['illustType'])
 
             # 尝试根据 userIllusts 更新其他插画的信息
             for other in origin_item.get('userIllusts', {}).values():
