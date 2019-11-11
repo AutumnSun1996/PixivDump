@@ -67,11 +67,12 @@ def reset_statistics():
 
 def update_search(response, *args, **kwargs):
     """处理搜索结果"""
+    items = None
     try:
         pq = pyquery.PyQuery(response.text)
         items = json.loads(pq("#js-mount-point-search-result-list").attr("data-items"))
         for origin_item in items:
-            if 'illustId' not in origin_item:
+            if origin_item.get('illustId', None) is None:
                 continue
             try:
                 item = {}
@@ -86,7 +87,7 @@ def update_search(response, *args, **kwargs):
         response.handler_error = None
     except Exception as e:
         response.handler_error = e
-        logger.exception("update_search failed for %s: %s", response.url, e)
+        logger.exception("update_search failed for %s => %s: %s", response.url, items, e)
 
 def try_update_illust(illust, update_time):
     try:
