@@ -403,14 +403,19 @@ def download_ugoira(p):
 
 def crawl_illust_file(limit=100):
     # 下载图片
-    n = next(db.illust.aggregate([
+    n = list(db.illust.aggregate([
         {"$match":{"bookmarkCount": {'$gte': config.illust_min_bookmarks}}},
         {"$addFields": {
             "countMatch": {"$eq":["$pageCount","$fileCount"]}
         }},
         {"$match":{"countMatch": False}},
         {'$count': 'n'}
-    ]))['n']
+    ]))
+    if n:
+        n = n[0]['n']
+    else:
+        # no matched illust
+        n = 0
     logger.info("crawl_illust_file of %s in %s illusts", limit, n)
     for p in db.illust.aggregate([
         {"$match":{"bookmarkCount": {'$gte': config.illust_min_bookmarks}}},
