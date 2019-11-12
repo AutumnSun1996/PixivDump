@@ -223,7 +223,7 @@ def save_file(response, pid, **kwargs):
         response.handler_error = e
         logger.exception("save_file failed for %s(%s): %s", pid, response.url, e)
 
-def crawl_by_search(params, skip_exists=True, page_limit=100):
+def crawl_by_search(params, skip_exists=True, page_limit=100, use_scd=None):
     # 第一页
     logger.debug("start crawl_by_search of fisrt page for %s", params)
     future = send_request(
@@ -242,7 +242,14 @@ def crawl_by_search(params, skip_exists=True, page_limit=100):
     n_pics = int(total[:-1])
     n_pages = math.ceil(n_pics / 40)
     logger.info("found %s pictures, in %s pages", n_pics, n_pages)
-    
+    if use_scd is not None:
+        if isinstance(use_scd, (int, float)):
+            use_scd = datetime.timedelta(days=use_scd)
+        elif isinstance(use_scd, (tuple, list)):
+            use_scd = datetime.timedelta(*use_scd)
+        scd = datetime.datetime.now() - use_scd
+        params['scd'] = scd.strftime('%Y-%m-%d')
+
     compare_cond = [{'detail.error': {'$exists': 0}}]
     if params.get('s_mode') is None:
         compare_cond += [{'tags': {'$regex': params['word']}}]
@@ -271,6 +278,12 @@ def crawl_by_search(params, skip_exists=True, page_limit=100):
         compare_cond += [{'height': {'$gte': params['hlt']}}]
     if 'hgt' in params:
         compare_cond += [{'height': {'$lte': params['hgt']}}]
+
+    if 'scd' in params:
+        compare_cond += [{'detail.createDate': {'$gte': params['scd']}}]
+    if 'ecd' in params:
+        # '~' = chr(126), 为可见ascii字符最大
+        compare_cond += [{'detail.createDate': {'$lte': params['ecd'] + '~'}}]
 
     local_count = db.illust.count_documents({'$and': compare_cond})
     logger.info("found %s pictures in database for cond %s", local_count, compare_cond)

@@ -1,6 +1,7 @@
 from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
 from apscheduler.executors.pool import ThreadPoolExecutor
 import logging
+import datetime
 
 import config
 import dump
@@ -28,25 +29,23 @@ def update_params_by_height(cond, lvls):
 
 scheduler = Scheduler(executers={"default": ThreadPoolExecutor(8)})
 
-for params in update_params_by_height(
-    {'s_mode': 's_tag_full', 'word': 'アズールレーン', 'order': 'date_d'},
-    [1200,2000],
-):
-    scheduler.add_job(
-        dump.crawl_by_search, kwargs={'params': params},
-        trigger='cron', second='0', minute='0', hour='*',
-        id="crawl_by_search-"+str(params), misfire_grace_time=60*60
-    )
+scheduler.add_job(
+    dump.crawl_by_search, kwargs={
+        'params': {'s_mode': 's_tag_full', 'word': 'アズールレーン', 'order': 'date_d'},
+        'use_scd': 2,
+    },
+    trigger='cron', second='0', minute='0', hour='*',
+    id="crawl_by_search-AZ@cron", misfire_grace_time=60*60
+)
 
-for params in update_params_by_height(
-    {'s_mode': 's_tag_full', 'word': 'Fate/GrandOrder', 'order': 'date_d'},
-    [700,800,900,1000,1050,1100,1200,1300,1500,1700,2000,2500,3500],
-):
-    scheduler.add_job(
-        dump.crawl_by_search, kwargs={'params': params},
-        trigger='cron', second='0', minute='0', hour='*',
-        id="crawl_by_search-"+str(params), misfire_grace_time=60*60
-    )
+scheduler.add_job(
+    dump.crawl_by_search, kwargs={
+        'params': {'s_mode': 's_tag_full', 'word': 'Fate/GrandOrder', 'order': 'date_d',},
+        'use_scd': 2,
+    },
+    trigger='cron', second='0', minute='0', hour='*',
+    id="crawl_by_search-FGO@cron", misfire_grace_time=60*60
+)
 
 scheduler.add_job(
     dump.crawl_detail,
