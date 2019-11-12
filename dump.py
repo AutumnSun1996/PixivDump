@@ -268,10 +268,10 @@ def crawl_by_search(params, skip_exists=True, page_limit=100):
     if 'wgt' in params:
         compare_cond += [{'width': {'$lte': params['wgt']}}]
     if 'hlt' in params:
-        compare_cond += [{'width': {'$gte': params['hlt']}}]
+        compare_cond += [{'height': {'$gte': params['hlt']}}]
     if 'hgt' in params:
-        compare_cond += [{'width': {'$lte': params['hgt']}}]
-    
+        compare_cond += [{'height': {'$lte': params['hgt']}}]
+
     local_count = db.illust.count_documents({'$and': compare_cond})
     logger.info("found %s pictures in database for cond %s", local_count, compare_cond)
 
