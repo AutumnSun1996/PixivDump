@@ -116,6 +116,7 @@ def update_detail(response, pid, *args, **kwargs):
         if info['error']:
             if not info['body']:
                 info.pop('body')
+            item.pop('detail')
             item['detail.error'] = info
         else:
             origin_item = info['body']
