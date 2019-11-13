@@ -51,6 +51,7 @@ def iter_file(file):
     while chunk:
         yield chunk
         chunk = file.readchunk()
+    print("Streaming finished for", file.metadata)
 
 def mongo_file(file):
     if 'ETag' in request.headers and request.headers['ETag'] == file.md5:
@@ -58,10 +59,15 @@ def mongo_file(file):
     print(request.url)
     print(request.headers)
     mimetype = mimetypes.guess_type(file.filename)[0]
-    resp = Response(iter_file(file), mimetype=mimetype)
+    if 'iter' in request.values:
+        resp = Response(iter_file(file), mimetype=mimetype)
+    else:
+        resp = Response(file.read(), mimetype=mimetype)
     resp.cache_control.public = True
-    resp.cache_control.max_age = 3600
+    resp.cache_control.max_age = 30*24*60
     resp.headers["ETag"] = file.md5
+    expire = datetime.datetime.utcnow() + datetime.timedelta(days=30)
+    resp.headers["Expires"] = expire.strftime('%a, %d %b %Y %H:%M:%S GMT')
     return resp
 
 @app.route("/pixiv/image/<illust_id>/<int:idx>")
