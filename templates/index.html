@@ -19,10 +19,15 @@
             <br>
             <input type="submit">
         </form>
+        <button onclick="setData('Fate/GrandOrder')">FGO</button>
+        <button onclick="setData('Fate/GrandOrder', 2)">FGO-动图</button>
+        <button onclick="setData('アズールレーン')">碧蓝航线</button>
+        <button onclick="setData('アズールレーン', 2)">碧蓝航线-动图</button>
         <script>
-            document.getElementsByName("match")[0].value = `{"$and":[\n{"tags":"Fate/GrandOrder"}\n]}`;
+        var match = document.getElementsByName("match")[0];
+        match.value = `{"$and":[\n{"tags":"Fate/GrandOrder"}\n]}`;
         function checkForm(){
-            var text = document.getElementsByName("match")[0].value;
+            var text = match.value;
             try {
                 var json = JSON.parse(text);
             }
@@ -31,6 +36,19 @@
                return false; 
             }
             return true;
+        }
+        function setData(tag, type){
+            var info = {
+            "$and": [
+                    {"tags": tag},
+                    {"tags":{"$ne":"R-18"}},
+                ]
+            }
+            if(!!type){
+                info["$and"].push({"illustType":2})
+            }
+            match.value = JSON.stringify(info);
+            document.getElementsByName("mainForm").submit();
         }
         </script>
     </body>
