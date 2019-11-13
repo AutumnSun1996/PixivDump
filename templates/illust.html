@@ -62,7 +62,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             }
             function showIllust(illust, out){
                 for(var i=0; i < illust.pageCount; ++i){
-                    out.innerHTML += `<img src="/pixiv/image?illustId=${illust.illustId}&pageIndex=${i}" alt="${illust.illustId}:${i+1}/${illust.pageCount}" width="${illust.width}" height="${illust.height}"/><br/>`;
+                    out.innerHTML += `<img src="/pixiv/image/${illust.illustId}/${i}" alt="${illust.illustId}:${i+1}/${illust.pageCount}" width="${illust.width}" height="${illust.height}"/><br/>`;
                 }
             }
             
@@ -151,7 +151,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                 }
                 frames[0].firstFrame = true;
                 
-                fetch(`/pixiv/zipFile?illustId=${illust.illustId}`).then(function (response) {
+                fetch(`/pixiv/zipFile/${illust.illustId}`, {cache: "force-cache"}).then(function (response) {
                     // filter on 200 OK
                     if (response.status === 200 || response.status === 0) {
                         return Promise.resolve(response.blob());
