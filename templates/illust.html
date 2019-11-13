@@ -193,7 +193,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                     showAnime(illust, display);
                 }
             }
-            loadIllust()
+            loadIllust();
             function next(){
                 idx ++;
                 loadIllust();
@@ -202,6 +202,50 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                 idx --;
                 loadIllust();
             }
+            
+            var touch = function (){
+                var startX, startY, startTime;
+                var widthThresh = window.outerWidth;
+                var speedTresh = widthThresh / 1000;
+
+                /*手指放在屏幕上*/    
+                document.addEventListener("touchstart", function(e){
+                    console.log(e);
+                    var touch = e.changedTouches[0];
+                    startX = touch.pageX;    
+                    startY = touch.pageY;    
+                    startTime = new Date().getTime(); //记录手指按下的开始时间
+                });
+
+                document.addEventListener("touchend",function(e){
+                    var touch = e.changedTouches[0];  // 必须使用changedTouches
+                    console.log(e);
+                    var deltaX = Math.abs(touch.pageX - startX);
+                    var deltaY = Math.abs(touch.pageY - startY);
+                    // 忽略极小的移动、Y方向的移动
+                    if (deltaX < 0.1 * widthThresh || deltaX < deltaY * 1.5){
+                        console.log("Ignored for invalid movement")
+                        return true;
+                    }
+                    var deltaT = new Date().getTime() - startTime;
+                    var speed = deltaX / deltaT;
+                    // 忽略极慢速的移动
+                    if (speed < 0.1 * speedTresh){
+                        console.log("Ignored for slow speed")
+                        return true;
+                    }
+                    e.preventDefault();
+
+                    var direction = touch.pageX > startX ? -1 : 1;  // 向右滑 -> 上一页; 向左滑 -> 下一页;
+                    console.log("END", direction, deltaX, deltaT, speed);
+                    if(speed > speedTresh || deltaX > widthThresh){
+                        idx = idx + direction;
+                        loadIllust();
+                    }
+                });
+                return {};
+            }();
+
             function onImageClick(){
                 console.log(event)
             }
