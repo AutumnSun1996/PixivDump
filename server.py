@@ -46,30 +46,39 @@ def to_json(obj):
 def index():
     return render_template("index.html")
 
-@app.route("/pixiv/image")
-def image():
-    illust_id = request.values.get('illustId')
-    if illust_id is None:
-        return 'Need illustId', 400
-    idx = int(request.values.get('pageIndex', 0))
+def iter_file(file):
+    chunk = file.readchunk()
+    while chunk:
+        yield chunk
+        chunk = file.readchunk()
+
+def mongo_file(file):
+    if 'ETag' in request.headers and request.headers['ETag'] == file.md5:
+        return ('', 304)
+    print(request.url)
+    print(request.headers)
+    mimetype = mimetypes.guess_type(file.filename)[0]
+    resp = Response(iter_file(file), mimetype=mimetype)
+    resp.cache_control.public = True
+    resp.cache_control.max_age = 3600
+    resp.headers["ETag"] = file.md5
+    return resp
+
+@app.route("/pixiv/image/<illust_id>/<int:idx>")
+def image(illust_id, idx):
     cond = {'metadata.illustId': illust_id, 'metadata.pageIndex': idx}
     f = fs.find_one(cond)
     if f is None:
         return 'illust not found', 404
-    mimetype = mimetypes.guess_type(f.filename)[0]
-    return Response(f.read(), mimetype=mimetype)
+    return mongo_file(f)
 
-@app.route("/pixiv/zipFile")
-def zip_image():
-    illust_id = request.values.get('illustId')
-    if illust_id is None:
-        return 'Need illustId', 400
+@app.route("/pixiv/zipFile/<illust_id>")
+def zip_image(illust_id):
     cond = {'metadata.illustId': illust_id, 'metadata.fileType': {'$ne': 'illust'}}
     f = fs.find_one(cond)
     if f is None:
         return 'ZipFile not found', 404
-    mimetype = mimetypes.guess_type(f.filename)[0]
-    return Response(f.read(), mimetype=mimetype)
+    return mongo_file(f)
 
 @app.route("/pixiv/search")
 def search():
