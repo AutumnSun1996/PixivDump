@@ -19,37 +19,56 @@
             <br>
             <input type="submit">
         </form>
-        <button onclick="setData('Fate/GrandOrder')">FGO</button>
-        <button onclick="setData('Fate/GrandOrder', 2)">FGO-动图</button>
-        <button onclick="setData('アズールレーン')">碧蓝航线</button>
-        <button onclick="setData('アズールレーン', 2)">碧蓝航线-动图</button>
+        <select id="history" onchange="updateInput()">
+        </select>
+        <br>
+        <button onclick="checkForm()">添加</button>
+        <button onclick="delHistory()">删除</button>
         <script>
-        var match = document.getElementsByName("match")[0];
-        match.value = `{"$and":[\n{"tags":"Fate/GrandOrder"}\n]}`;
-        function checkForm(){
-            var text = match.value;
-            try {
-                var json = JSON.parse(text);
+            var match = document.getElementsByName("match")[0];
+            var select = document.getElementById("history");
+            var historyInputs = JSON.parse(localStorage.getItem('history') || '{}');
+
+            function checkForm(){
+                var text = match.value;
+                try {
+                    var json = JSON.parse(text);
+                }
+                catch(err) {
+                   alert(err)
+                   return false; 
+                }
+                historyInputs[text] = new Date();
+                localStorage.setItem('history', JSON.stringify(historyInputs));
+                setOptions();
+                return true;
             }
-            catch(err) {
-               alert(err)
-               return false; 
+            function setOptions(){
+                select.innerHTML = '';
+                var items = []
+                for(var text in historyInputs){
+                    items.push([historyInputs[text], text])
+                }
+                for(var item of items.sort().reverse()){
+                    var option = document.createElement("option");
+                    option.key = item[1];
+                    option.innerText = item[1];
+                    select.appendChild(option);
+                }
             }
-            return true;
-        }
-        function setData(tag, type){
-            var info = {
-            "$and": [
-                    {"tags": tag},
-                    {"tags":{"$ne":"R-18"}},
-                ]
+            function updateInput(){
+                match.value = select.selectedOptions[0].key;
             }
-            if(!!type){
-                info["$and"].push({"illustType":2})
+            function delHistory(){
+                var value = select.selectedOptions[0].key;
+                if(!!historyInputs[value]){
+                    delete historyInputs[value];
+                    localStorage.setItem('history', JSON.stringify(historyInputs));
+                    setOptions();
+                }
             }
-            match.value = JSON.stringify(info);
-            document.getElementsByName("mainForm").submit();
-        }
+            setOptions();
+            updateInput();
         </script>
     </body>
 </html>
