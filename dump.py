@@ -10,7 +10,7 @@ import pyquery
 from requests_futures.sessions import FuturesSession
 import logging
 
-import config
+import tools as config
 logger = logging.getLogger(__name__)
 
 db = pymongo.MongoClient(**config.mongo_kwargs)[config.mongo_db_name]

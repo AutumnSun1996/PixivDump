@@ -2,3 +2,5 @@
 Tail.ipynb
 __pycache__/
 logs/
+configs.py
+
