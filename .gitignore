@@ -1,4 +1,6 @@
 .ipynb_checkpoints/
-Tail.ipynb
+*.ipynb
 __pycache__/
 logs/
+configs.py
+

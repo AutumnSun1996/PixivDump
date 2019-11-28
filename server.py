@@ -1,4 +1,4 @@
-import config
+import tools as config
 
 from flask import Flask, request, render_template, Response, Request, jsonify, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
