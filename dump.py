@@ -3,6 +3,7 @@ import json
 import math
 import json
 import datetime
+from urllib.parse import quote_plus
 
 import pymongo
 import gridfs
@@ -69,8 +70,8 @@ def update_search(response, *args, **kwargs):
     """处理搜索结果"""
     items = None
     try:
-        pq = pyquery.PyQuery(response.text)
-        items = json.loads(pq("#js-mount-point-search-result-list").attr("data-items"))
+        info = response.json()['body']
+        items = info['illustManga']['data'] + info['popular']['recent'] + info['popular']['permanent']
         for origin_item in items:
             if origin_item.get('illustId', None) is None:
                 continue
@@ -223,33 +224,7 @@ def save_file(response, pid, **kwargs):
         response.handler_error = e
         logger.exception("save_file failed for %s(%s): %s", pid, response.url, e)
 
-def crawl_by_search(params, skip_exists=True, page_limit=100, use_scd=None):
-    # 第一页
-    logger.debug("start crawl_by_search of fisrt page for %s", params)
-    future = send_request(
-        'GET', "https://210.140.131.182:443/search.php",
-        params=params,
-        timeout=config.TIMEOUT,
-        verify=False, 
-        headers=config.HEADERS['search'],
-        hooks={
-            'response': update_search,
-        },
-    )
-    res = future.result()
-    pq = pyquery.PyQuery(res.text)
-    total = pq('.count-badge').text()
-    n_pics = int(total[:-1])
-    n_pages = math.ceil(n_pics / 40)
-    logger.info("found %s pictures, in %s pages", n_pics, n_pages)
-    if use_scd is not None:
-        if isinstance(use_scd, (int, float)):
-            use_scd = datetime.timedelta(days=use_scd)
-        elif isinstance(use_scd, (tuple, list)):
-            use_scd = datetime.timedelta(*use_scd)
-        scd = datetime.datetime.now() - use_scd
-        params['scd'] = scd.strftime('%Y-%m-%d')
-
+def count_local_illust(params):
     compare_cond = [{'detail.error': {'$exists': 0}}]
     if params.get('s_mode') is None:
         compare_cond += [{'tags': {'$regex': params['word']}}]
@@ -287,24 +262,58 @@ def crawl_by_search(params, skip_exists=True, page_limit=100, use_scd=None):
 
     local_count = db.illust.count_documents({'$and': compare_cond})
     logger.info("found %s pictures in database for cond %s", local_count, compare_cond)
+    return local_count
+
+def crawl_by_search(search_params, skip_exists=True, page_limit=100, use_scd=None):
+    # 第一页
+    logger.debug("start crawl_by_search of fisrt page for %s", search_params)
+    params = config.default_search_params.copy()
+    params.update(search_params)
+    search_url = "https://210.140.131.182:443/ajax/search/artworks/" + quote_plus(params['word'])
+    future = send_request(
+        'GET', search_url,
+        params=params,
+        timeout=config.TIMEOUT,
+        verify=False, 
+        headers=config.HEADERS['search'],
+        hooks={
+            'response': update_search,
+        },
+    )
+    res = future.result()
+    info = res.json()['body']['illustManga']
+    n_pics = info['total']
+    n_per_page = len(info['data'])
+    if n_per_page == 0:
+        logger.info("Get no pictures(total=%d) for %s, abort.", n_pics, search_params)
+        return
+    n_pages = math.ceil(n_pics / n_per_page)
+    logger.info("found %s pictures in %s pages for %s", n_pics, n_pages, search_params)
+    if use_scd is not None:
+        if isinstance(use_scd, (int, float)):
+            use_scd = datetime.timedelta(days=use_scd)
+        elif isinstance(use_scd, (tuple, list)):
+            use_scd = datetime.timedelta(*use_scd)
+        scd = datetime.datetime.now() - use_scd
+        params['scd'] = scd.strftime('%Y-%m-%d')
 
     if skip_exists:
-        n_pics_more = n_pics - local_count
+        n_pics_more = n_pics - count_local_illust(search_params)
     else:
         n_pics_more = n_pics
 
-    n_pages_more = min(math.ceil(n_pics_more / 40), page_limit, 1000) - 1
+    n_pages_more = min(math.ceil(n_pics_more / n_per_page), page_limit, 1000) - 1
     if n_pages_more < 0:
         n_pages_more = 0
-    n_pics_more = min(n_pics_more, n_pages_more * 40)
-    logger.info("will crawl %s pages for %s more pictures", n_pages_more, n_pics_more)
+    n_pics_more = min(n_pics_more, n_pages_more * n_per_page)
+    logger.info("will crawl %s pages for %s pictures", n_pages_more, n_pics_more)
 
     # 其余页
     for i in range(2, n_pages_more + 2):
         p = params.copy()
         p['p'] = i
         r = send_request(
-            'GET', "https://210.140.131.182:443/search.php", 
+            'GET', search_url,
             params=p,
             timeout=config.TIMEOUT,
             verify=False, 
@@ -328,6 +337,7 @@ def crawl_detail_by_id(illust_id):
         }
     )
     logger.debug("start crawl_detail for %s", illust_id)
+    return r
 
 def crawl_detail(limit=1000):
     cond = {'detail': {'$exists': 0}}

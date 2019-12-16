@@ -96,21 +96,18 @@ def check_results(all_results, handle_left=None):
 
 HEADERS = {}
 HEADERS['search'] = parse_header("""
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3
+accept: application/json
 Accept-Encoding: gzip, deflate, br
 Accept-Language: zh-CN,zh;q=0.9
 Cache-Control: no-cache
 Connection: keep-alive
 Host: www.pixiv.net
 Pragma: no-cache
-Referer: https://www.pixiv.net/
-Sec-Fetch-Mode: navigate
+Referer: https://www.pixiv.net
+Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
-Sec-Fetch-User: ?1
-Upgrade-Insecure-Requests: 1
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.90 Safari/537.36
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36
 """)
-HEADERS['search']['Cookie'] = search_cookie
 
 HEADERS['detail'] = parse_header("""
 Accept: application/json, text/javascript, */*; q=0.01
@@ -128,7 +125,7 @@ X-Requested-With: XMLHttpRequest
 """)
 
 key_names = {
-    'search': 'illustId illustTitle illustType tags userId userName userImage width height pageCount bookmarkCount'.split(' '),
+    'search': 'illustId illustTitle illustType tags userId userName width height pageCount'.split(' '),
     'detail': 'tags bookmarkCount pageCount description createDate viewCount likeCount commentCount uploadDate'.split(' '),
     'detail2search': 'illustTitle illustType userId userName bookmarkCount pageCount width height'.split(' '),
     'detail2history': 'illustId bookmarkCount viewCount likeCount commentCount'.split(' '),
