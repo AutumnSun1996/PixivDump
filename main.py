@@ -38,24 +38,33 @@ def check_all_month(params, bins):
             p['ecd'] = right
         dump.crawl_by_search(p, skip_exists=False)
 
-bins_az = [None, "2017-09-01", ] + all_months_since((2017, 11)) + [None]
-bins_fgo = [None, "2015-12-01", "2016-02-01", "2016-04-01"] + all_months_since((2016, 5)) + [None]
+bins_az = ["", "2017-09-01", ] + all_months_since((2017, 11)) + [""]
+bins_fgo = ["", "2015-12-01", "2016-02-01", "2016-04-01"] + all_months_since((2016, 5)) + [""]
+bins_all = ["", "2015-01-01", "2017-01-01", "2018-01-01", "2019-01-01", "2020-01-01", ""]
 
 if __name__ == "__main__":
     scheduler = Scheduler(executers={"default": ThreadPoolExecutor(8)})
+
+    scheduler.add_job(
+        check_all_month, kwargs={'params': {'word': '10000users入り', 's_mode': 's_tag', 'mode': 'r18'}, 'bins': bins_all},
+        trigger='cron', second='0', minute='0', hour='2', day_of_week='sun',
+        id="check_all_month-All@cron", misfire_grace_time=60*60
+    )
+    scheduler.add_job(
+        dump.crawl_by_search, kwargs={
+            'search_params': {'word': '10000users入り', 's_mode': 's_tag', 'mode': 'r18'},
+            'use_scd': 2,
+        },
+        trigger='cron', second='0', minute='0', hour='*',
+        id="crawl_by_search-All@cron", misfire_grace_time=60*60
+    )
+
 
     scheduler.add_job(
         check_all_month, kwargs={'params': {'word': 'アズールレーン'}, 'bins': bins_az},
         trigger='cron', second='0', minute='0', hour='2', day_of_week='sun',
         id="check_all_month-AZ@cron", misfire_grace_time=60*60
     )
-
-    scheduler.add_job(
-        check_all_month, kwargs={'params': {'word': 'Fate/GrandOrder'}, 'bins': bins_fgo},
-        trigger='cron', second='0', minute='0', hour='2', day_of_week='sun',
-        id="check_all_month-FGO@cron", misfire_grace_time=60*60
-    )
-
     scheduler.add_job(
         dump.crawl_by_search, kwargs={
             'search_params': {'word': 'アズールレーン'},
@@ -65,6 +74,11 @@ if __name__ == "__main__":
         id="crawl_by_search-AZ@cron", misfire_grace_time=60*60
     )
 
+    scheduler.add_job(
+        check_all_month, kwargs={'params': {'word': 'Fate/GrandOrder'}, 'bins': bins_fgo},
+        trigger='cron', second='0', minute='0', hour='2', day_of_week='sun',
+        id="check_all_month-FGO@cron", misfire_grace_time=60*60
+    )
     scheduler.add_job(
         dump.crawl_by_search, kwargs={
             'search_params': {'word': 'Fate/GrandOrder'},

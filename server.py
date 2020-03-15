@@ -93,6 +93,10 @@ def search():
         limit = int(request.values.get('limit', 100))
     except Exception as e:
         return 'Invalid param: ' + str(e), 400
+    if "$and" in match:
+        match["$and"] += [{"detail.error": {"$exists": 0}}]
+    else:
+        match["detail.error"] = {"$exists": 0}
     result = list(db.illust.find(
         match, 
         {'_id': 0,}

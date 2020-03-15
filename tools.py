@@ -2,12 +2,32 @@ import urllib3
 import logging
 import logging.config
 import yaml
+import os
 
 from configs import *
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-logging.config.dictConfig(yaml.load("""
+if os.environ.get('DEBUG'):
+    logging.config.dictConfig(yaml.load("""
+version: 1
+disable_existing_loggers: False
+formatters:
+    dump:
+        format: "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s@%(filename)s[%(lineno)d]: %(message)s"
+handlers:
+    console:
+        class: logging.StreamHandler
+        level: DEBUG
+        formatter: dump
+        stream: ext://sys.stdout
+root:
+    level: DEBUG
+    handlers: [console]
+"""))
+    logging.info("Debug log ON.")
+else:
+    logging.config.dictConfig(yaml.load("""
 version: 1
 disable_existing_loggers: False
 formatters:
@@ -97,17 +117,15 @@ def check_results(all_results, handle_left=None):
 HEADERS = {}
 HEADERS['search'] = parse_header("""
 accept: application/json
-Accept-Encoding: gzip, deflate, br
-Accept-Language: zh-CN,zh;q=0.9
-Cache-Control: no-cache
-Connection: keep-alive
-Host: www.pixiv.net
-Pragma: no-cache
-Referer: https://www.pixiv.net
-Sec-Fetch-Mode: cors
-Sec-Fetch-Site: same-origin
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36
+host: www.pixiv.net
+accept-encoding: gzip, deflate, br
+accept-language: zh-CN,zh;q=0.9
+referer: https://www.pixiv.net/tags/Fate%2FGrandOrder/artworks?s_mode=s_tag
+sec-fetch-mode: cors
+sec-fetch-site: same-origin
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36
 """)
+HEADERS['search'].update(search_headers)
 
 HEADERS['detail'] = parse_header("""
 Accept: application/json, text/javascript, */*; q=0.01

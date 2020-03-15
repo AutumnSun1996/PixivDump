@@ -30,6 +30,8 @@ def extra_args(func, *extra_args, **extra_kwargs):
     return new_func
 
 def update_result(r, target, *args, **kwargs):
+    if not hasattr(r, 'handler_error'):
+        return
     target['done'] += 1
     if r.handler_error is None:
         target['success'] += 1
@@ -71,23 +73,29 @@ def update_search(response, *args, **kwargs):
     items = None
     try:
         info = response.json()['body']
-        items = info['illustManga']['data'] + info['popular']['recent'] + info['popular']['permanent']
+        items = []
+        for key in ['illustManga', 'illust', 'manga']:
+            if key in info:
+                items += info[key]['data']
+        items += info['popular']['recent'] + info['popular']['permanent']
         for origin_item in items:
             if origin_item.get('illustId', None) is None:
                 continue
+            item = {}
+            for key in config.key_names['search']:
+                item[key] = origin_item[key]
+            item['updateTime'] = datetime.datetime.now()
+            # 保证illustType为int类型
+            if 'illustType' in item:
+                item['illustType'] = int(item['illustType'])
             try:
-                item = {}
-                for key in config.key_names['search']:
-                    item[key] = origin_item[key]
-                item['updateTime'] = datetime.datetime.now()
-                # 保证illustType为int类型
-                if 'illustType' in item:
-                    item['illustType'] = int(item['illustType'])
                 db.illust.insert_one(item)
+                logger.debug("insert, illustId=%s", item.get("illustId"))
             except pymongo.errors.DuplicateKeyError:
                 item.pop("_id")
                 pid = item.pop('illustId')
                 db.illust.update_one({'illustId': pid}, {'$set': item})
+                logger.debug("update, illustId=%s", pid)
         response.handler_error = None
     except Exception as e:
         response.handler_error = e
@@ -172,10 +180,13 @@ def update_ugoira_meta(response, pid, *args, **kwargs):
 def save_illust(response, pid, index, **kwargs):
     """保存文件"""
     try:
+        if response.status_code != 200:
+            raise Exception("HTTP %d" % response.status_code)
+
         logger.debug('save_illust for %s start', pid)
         info = {'illustId': pid, 'pageIndex': index, 'fileType': 'illust'}
         url = response.url
-        
+
         if fs.exists(filename=url):
             file_id = fs.get_last_version(filename=url)._id
             logger.warning('ignore existing file: %s(%s)', pid, url)
@@ -234,29 +245,30 @@ def count_local_illust(params):
         compare_cond += [{'content': {'$regex': params['word']}}]
     else:
         logger.error("invalid s_mode: %s", params['s_mode'])
-    
-    if 'type' in params:
-        local_key = {'illust': 0, 'manga': 1, 'ugoira': 2}.get(params['type'])
+
+    if params.get('type', 'all') != "all":
+        local_key = {'illust': 0, 'manga': 1, 'ugoira': 2}[params['type']]
         compare_cond += [{'illustType': {'$eq': local_key}}]
 
-    if 'mode' in params:
-        if params['mode'].lower() == 'r18':
+    if params.get('mode') is not None:
+        mode = params['mode'].lower()
+        if mode == 'r18':
             compare_cond += [{'tags': {'$eq': 'R-18'}}]
-        else:
+        elif mode == 'safe':
             compare_cond += [{'tags': {'$ne': 'R-18'}}]
-    
-    if 'wlt' in params:
+
+    if params.get('wlt') is not None:
         compare_cond += [{'width': {'$gte': params['wlt']}}]
-    if 'wgt' in params:
+    if params.get('wgt') is not None:
         compare_cond += [{'width': {'$lte': params['wgt']}}]
-    if 'hlt' in params:
+    if params.get('hlt') is not None:
         compare_cond += [{'height': {'$gte': params['hlt']}}]
-    if 'hgt' in params:
+    if params.get('hgt') is not None:
         compare_cond += [{'height': {'$lte': params['hgt']}}]
 
-    if 'scd' in params:
+    if params.get('scd') is not None:
         compare_cond += [{'detail.createDate': {'$gte': params['scd']}}]
-    if 'ecd' in params:
+    if params.get('ecd') is not None:
         # '~' = chr(126), 为可见ascii字符最大
         compare_cond += [{'detail.createDate': {'$lte': params['ecd'] + '~'}}]
 
@@ -298,7 +310,7 @@ def crawl_by_search(search_params, skip_exists=True, page_limit=100, use_scd=Non
         params['scd'] = scd.strftime('%Y-%m-%d')
 
     if skip_exists:
-        n_pics_more = n_pics - count_local_illust(search_params)
+        n_pics_more = n_pics - count_local_illust(params)
     else:
         n_pics_more = n_pics
 
@@ -389,16 +401,20 @@ def download_illust(p):
         url = p['imageUrlFormat'].format(pageIndex=i)
         if fs.exists(filename=url):
             continue
+        
+        hds = {
+            'Sec-Fetch-Mode': 'navigate',
+            'Referer': 'https://www.pixiv.net/artworks/' + p['illustId'],
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36'
+        }
+        if 'i.pximg.net' in url:
+            url = url.replace('i.pximg.net', '210.140.92.140:443')
+            hds['Host']= 'i.pximg.net'
         r = send_request(
-            'GET', url.replace('i.pximg.net', '210.140.92.140:443'),
+            'GET', url,
             timeout=config.TIMEOUT,
             verify=False,
-            headers={
-                'Sec-Fetch-Mode': 'no-cors',
-                'Host': 'i.pximg.net',
-                'Referer': 'https://www.pixiv.net/artworks/' + p['illustId'],
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.90'
-            },
+            headers=hds,
             hooks={
                 'response': extra_args(save_illust, pid=p['illustId'], index=i),
             }
@@ -428,7 +444,10 @@ def download_ugoira(p):
 def crawl_illust_file(limit=100):
     # 下载图片
     n = list(db.illust.aggregate([
-        {"$match":{"bookmarkCount": {'$gte': config.illust_min_bookmarks}}},
+        {"$match":{
+            "bookmarkCount": {'$gte': config.illust_min_bookmarks},
+            "detail.error": {"$exists": 0}
+        }},
         {"$addFields": {
             "countMatch": {"$eq":["$pageCount","$fileCount"]}
         }},
@@ -442,7 +461,10 @@ def crawl_illust_file(limit=100):
         n = 0
     logger.info("crawl_illust_file of %s in %s illusts", limit, n)
     for p in db.illust.aggregate([
-        {"$match":{"bookmarkCount": {'$gte': config.illust_min_bookmarks}}},
+        {"$match":{
+            "bookmarkCount": {'$gte': config.illust_min_bookmarks},
+            "detail.error": {"$exists": 0}
+        }},
         {"$addFields": {
             "countMatch": {"$eq":["$pageCount","$fileCount"]}
         }},
@@ -451,8 +473,8 @@ def crawl_illust_file(limit=100):
         {'$sort': {'bookmarkCount': -1}}, # 按收藏数降序排列
         {'$limit': limit} # 取前limit张图片
     ]):
-        download_illust(p)
         logger.debug("start crawl_illust for %s", p['illustId'])
+        download_illust(p)
 
 def crawl_anime_file(limit=100):
     cond = {
