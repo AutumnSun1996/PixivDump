@@ -9,6 +9,27 @@
             width: 100%;
             height: 40%;
         }
+
+        .popContainer {
+            text-align: center;
+            font-size: large;
+            color: white;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+
+        }
+
+        .popText {
+            position: absolute;
+            text-align: center;
+            width: 100%;
+            top: 50%;
+            margin-top: 0;
+        }
     </style>
 </head>
 
@@ -21,7 +42,11 @@
         <br>
         <input type="submit">
     </form>
-    <select id="history" onchange="updateInput()">
+    <!-- <div id="popup" class="popContainer"> -->
+    <div id="popup" class="popContainer" style="display: none;">
+        <p class="popText">请求中...</p>
+    </div>
+    <select id="history" onchange="updateInput()" style="width: 100%;">
     </select>
     <br>
     <button onclick="checkForm()">添加</button>
@@ -39,6 +64,8 @@
                 localStorage.setItem('history', JSON.stringify(historyInputs));
                 setOptions();
                 if (doFetch) {
+                    var popup = document.getElementById("popup");
+                    popup.style.display = '';
                     console.log("FETCH")
                     fetch(
                         '{{ url_for("search") }}',
@@ -49,15 +76,17 @@
                                 "Content-Type": "application/json"
                             }
                         }).then((resp) => {
-                            return resp.json()
+                            return resp.json();
                         }).then((data) => {
                             if (data.count == 0) {
                                 alert("无数据");
+                                popup.style.display = 'none';
                             } else {
                                 // 设置搜索结果数据
                                 data.query = jsonData;
                                 data.idx = document.getElementById("pageIdx").value;
                                 sessionStorage.illusts = JSON.stringify(data);
+                                popup.style.display = 'none';
                                 // 跳转到新页面
                                 location.pathname = "{{ url_for('illust') }}";
                             }
