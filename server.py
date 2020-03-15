@@ -23,6 +23,8 @@ import json
 import cv2 as cv
 import numpy as np
 
+import dump
+
 app_host = "0.0.0.0"
 app_port = 10101
 app_debug = False
@@ -34,8 +36,8 @@ if not app_debug:
 
 logger = logging.getLogger("server")
 
-db = pymongo.MongoClient(**config.mongo_kwargs)[config.mongo_db_name]
-fs = gridfs.GridFS(db)
+db = dump.db
+fs = dump.fs
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -101,15 +103,19 @@ def image(illust_id, idx):
     cond = {"metadata.illustId": illust_id, "metadata.pageIndex": idx}
     f = fs.find_one(cond)
     if f is None:
+        # 添加下载任务
+        dump.download_illust(db.illust.find_one({"illustId": pid}))
         return "illust not found", 404
     return mongo_file(f)
 
 
 @app.route("/pixiv/zipFile/<illust_id>")
 def zip_image(illust_id):
-    cond = {"metadata.illustId": illust_id, "metadata.fileType": {"$ne": "illust"}}
+    cond = {"metadata.illustId": illust_id, "metadata.fileType": "frames"}
     f = fs.find_one(cond)
     if f is None:
+        # 添加下载任务
+        dump.download_ugoira(db.illust.find_one({"illustId": pid}))
         return "ZipFile not found", 404
     return mongo_file(f)
 
