@@ -1,6 +1,15 @@
 import tools as config
 
-from flask import Flask, request, render_template, Response, Request, jsonify, redirect, url_for
+from flask import (
+    Flask,
+    request,
+    render_template,
+    Response,
+    Request,
+    jsonify,
+    redirect,
+    url_for,
+)
 from werkzeug.middleware.proxy_fix import ProxyFix
 import json
 import io
@@ -11,22 +20,26 @@ import pymongo
 import gridfs
 import logging
 import json
+import cv2 as cv
+import numpy as np
 
-app_host = '0.0.0.0'
+app_host = "0.0.0.0"
 app_port = 10101
 app_debug = False
 
 if not app_debug:
     from gevent import monkey
+
     monkey.patch_all()
 
-logger = logging.getLogger('server')
+logger = logging.getLogger("server")
 
 db = pymongo.MongoClient(**config.mongo_kwargs)[config.mongo_db_name]
 fs = gridfs.GridFS(db)
 
-app = Flask(__name__);
+app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
 
 def default(obj):
     if isinstance(obj, datetime.datetime):
@@ -35,16 +48,17 @@ def default(obj):
         return str(obj)
     return obj
 
+
 def to_json(obj):
     return json.dumps(
-        obj, indent=None, ensure_ascii=False, 
-        separators=(',', ':'),
-        default=default
+        obj, indent=None, ensure_ascii=False, separators=(",", ":"), default=default
     )
+
 
 @app.route("/pixiv/")
 def index():
     return render_template("index.html")
+
 
 def iter_file(file):
     chunk = file.readchunk()
@@ -53,78 +67,96 @@ def iter_file(file):
         chunk = file.readchunk()
     print("Streaming finished for", file.metadata)
 
+
 def mongo_file(file):
-    if 'ETag' in request.headers and request.headers['ETag'] == file.md5:
-        return ('', 304)
-    print(request.url)
-    print(request.headers)
+    if "ETag" in request.headers and request.headers["ETag"] == file.md5:
+        return ("", 304)
     mimetype = mimetypes.guess_type(file.filename)[0]
-    if 'iter' in request.values:
-        resp = Response(iter_file(file), mimetype=mimetype)
-    else:
-        resp = Response(file.read(), mimetype=mimetype)
+    data = file.read()
+    if (
+        "raw" not in request.headers  # 未要求原图
+        and file.filename.endswith((".jpg", ".png"))  # 图片文件
+        and len(data) > 204800  # 超过200k
+    ):
+        img = cv.imdecode(np.frombuffer(data, dtype="uint8"), cv.IMREAD_UNCHANGED)
+        if img.shape[1] > 1280:
+            # 限制最大宽度为 1280
+            ratio = 1280 / img.shape[1]
+            img = cv.resize(img, (0, 0), fx=ratio, fy=ratio)
+        _, res = cv.imencode(".jpg", img, [int(cv.IMWRITE_JPEG_QUALITY), 70])
+        print("压缩: %d -> %d", len(data), len(res))
+        data = res.tobytes()
+
+    resp = Response(data, mimetype=mimetype)
     resp.cache_control.public = True
-    resp.cache_control.max_age = 30*24*60
+    resp.cache_control.max_age = 30 * 24 * 60
     resp.headers["ETag"] = file.md5
     expire = datetime.datetime.utcnow() + datetime.timedelta(days=30)
-    resp.headers["Expires"] = expire.strftime('%a, %d %b %Y %H:%M:%S GMT')
+    resp.headers["Expires"] = expire.strftime("%a, %d %b %Y %H:%M:%S GMT")
     return resp
+
 
 @app.route("/pixiv/image/<illust_id>/<int:idx>")
 def image(illust_id, idx):
-    cond = {'metadata.illustId': illust_id, 'metadata.pageIndex': idx}
+    cond = {"metadata.illustId": illust_id, "metadata.pageIndex": idx}
     f = fs.find_one(cond)
     if f is None:
-        return 'illust not found', 404
+        return "illust not found", 404
     return mongo_file(f)
+
 
 @app.route("/pixiv/zipFile/<illust_id>")
 def zip_image(illust_id):
-    cond = {'metadata.illustId': illust_id, 'metadata.fileType': {'$ne': 'illust'}}
+    cond = {"metadata.illustId": illust_id, "metadata.fileType": {"$ne": "illust"}}
     f = fs.find_one(cond)
     if f is None:
-        return 'ZipFile not found', 404
+        return "ZipFile not found", 404
     return mongo_file(f)
+
 
 @app.route("/pixiv/search")
 def search():
     try:
-        match = json.loads(request.values.get('match'))
-        limit = int(request.values.get('limit', 100))
+        match = json.loads(request.values.get("match"))
+        limit = int(request.values.get("limit", 100))
     except Exception as e:
-        return 'Invalid param: ' + str(e), 400
+        return "Invalid param: " + str(e), 400
     if "$and" in match:
         match["$and"] += [{"detail.error": {"$exists": 0}}]
     else:
         match["detail.error"] = {"$exists": 0}
-    result = list(db.illust.find(
-        match, 
-        {'_id': 0,}
-    ).sort([('bookmarkCount', -1)]).limit(limit))
+    result = list(
+        db.illust.find(match, {"_id": 0,}).sort([("bookmarkCount", -1)]).limit(limit)
+    )
     return jsonify(result)
+
 
 @app.route("/pixiv/user/<uid>")
 def user_redirect(uid):
-    return redirect(url_for('illust', match=to_json({'userId': uid})))
+    return redirect(url_for("illust", match=to_json({"userId": uid})))
+
 
 @app.route("/pixiv/illust")
 def illust():
     try:
-        match = json.loads(request.values.get('match'))
-        limit = int(request.values.get('limit', 100))
-        idx = int(request.values.get('idx', 0))
+        match = json.loads(request.values.get("match"))
+        limit = int(request.values.get("limit", 100))
+        idx = int(request.values.get("idx", 0))
     except Exception as e:
-        return 'Invalid param: ' + str(e), 400
-    result = list(db.illust.find(
-        match, 
-        {'_id': 0}
-    ).sort([('bookmarkCount', -1)]).limit(limit))
-    return render_template("illust.html", illust=to_json(result), idx=idx, count=len(result))
+        return "Invalid param: " + str(e), 400
+    result = list(
+        db.illust.find(match, {"_id": 0}).sort([("bookmarkCount", -1)]).limit(limit)
+    )
+    return render_template(
+        "illust.html", illust=to_json(result), idx=idx, count=len(result)
+    )
+
 
 if __name__ == "__main__":
     if app_debug:
         app.run(app_host, app_port, debug=True)
     else:
         from gevent.pywsgi import WSGIServer
+
         http_server = WSGIServer((app_host, app_port), app, log=logger)
         http_server.serve_forever()
