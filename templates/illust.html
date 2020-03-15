@@ -31,13 +31,18 @@
     <button onclick="previous()">上一个</button><button onclick="next()">下一个</button>
     <input type="number" name="pageIndex" id="pageIndex">
     <button onclick="gotoPage()">GO</button>
+    <div class="display" id="illust-control"></div>
     <div class="display" id="illust-display"></div>
     <div class="display">
         <button onclick="goTop()">TOP</button>
     </div>
     <script>
         var illusts = JSON.parse(sessionStorage.illusts);
-        var idx = illusts.idx || 0;
+        var idx = illusts.idx || 1;
+        var hashIdx = /name(\d+)$/.exec(location.hash);
+        if (hashIdx) {
+            idx = parseInt(hashIdx[1]);
+        }
         var count = illusts.count;
         function addHeader(illust, out) {
             var desc = '';
@@ -54,12 +59,12 @@
             }
 
             out.innerHTML = `
-<h2 id="name${idx}">${idx + 1}.<a href="https://www.pixiv.net/artworks/${illust.illustId}" target="_blank">${illust.illustTitle}</a></h2>
+<h2 id="name${idx}">${idx}.<a href="https://www.pixiv.net/artworks/${illust.illustId}" target="_blank">${illust.illustTitle}</a></h2>
 (pid=${illust.illustId},uid=${illust.userId},type=${illust.illustType}) <br>
-<a href='/pixiv/'>Home</a><br>
-<a href='/pixiv/user/${illust.userId}'>${illust.userName}</a>
+<a href='{{ url_for("index") }}'>Home</a><br>
+<a href='#user${illust.userId}' onclick="searchUser('${illust.userId}')">${illust.userName}</a>
 <br>
-${idx + 1}/${count}
+${idx}/${count}
 &nbsp;${illust.detail.createDate}
 ${desc}
 ${tagHtml}
@@ -80,14 +85,15 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             a.readAsDataURL(blob);
         }
         var animes = {};
-        var loadFrames = function (illust, frames, out) {
-            out.innerHTML = `
+        function loadFrames(illust, frames, control, display) {
+            control.innerHTML = `
                 <button onclick="animes['${illust.illustId}'].toggle(this)">暂停</button>
                 <button onclick="animes['${illust.illustId}'].next()">下一帧</button>
                 <span id="info-${illust.illustId}"></span>
-                <hr>
+                <hr>`;
+            display.innerHTML = `
                 <canvas id="canvas-${illust.illustId}" width="${illust.width}" height="${illust.height}"></canvas>
-                `;
+            `;
 
             frames[0]["img"].onload = updateFrame;
 
@@ -148,7 +154,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             }
         }
 
-        function showAnime(illust, out) {
+        function showAnime(illust, control, display) {
             var frames = [];
             for (var f of illust.frameInfo.frames) {
                 frames.push({
@@ -174,7 +180,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                         var a = new FileReader();
                         a.onload = function (e) {
                             if (frame.firstFrame) {
-                                animes[illust.illustId] = loadFrames(illust, frames, out);
+                                animes[illust.illustId] = loadFrames(illust, frames, control, display);
                             }
                             frame.img.src = e.target.result;
                             console.log(`Image loaded: ${frame.name}`)
@@ -186,14 +192,23 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
         }
 
         function loadIllust() {
+            if (idx < 1) {
+                alert("最小idx为1");
+                idx = 1;
+            } else if (idx > illusts.count) {
+                alert(`最大idx为${illusts.count}`);
+                idx = illusts.count;
+            }
             document.getElementById("pageIndex").value = idx;
             location.hash = "#name" + idx;
 
             var header = document.getElementById("illust-header");
+            var control = document.getElementById("illust-control");
             var display = document.getElementById("illust-display");
             header.innerHTML = 'Loading';
+            control.innerHTML = '';
             display.innerHTML = '';
-            var illust = illusts.data[idx];
+            var illust = illusts.data[idx - 1];
             if (!illust) {
                 header.innerHTML = 'Load failed';
                 return
@@ -201,8 +216,12 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             addHeader(illust, header);
             goTop();
             showIllust(illust, display);
-            if (illust.illustType == 2 && !!illust.frameInfo.frames) {
-                showAnime(illust, display);
+            if (illust.illustType == 2) {
+                if(!!illust.frameInfo.frames){
+                    showAnime(illust, control, display);
+                } else {
+                    display.innerHTML += `<br> 暂无动画信息`
+                }
             }
         }
         loadIllust();
@@ -295,8 +314,8 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                 return;
             }
         }
-        document.addEventListener('keyup', keyHandler)
-        document.addEventListener('dblclick', toggleFullScreen)
+        document.addEventListener('keyup', keyHandler);
+        document.getElementById("illust-display").addEventListener('dblclick', toggleFullScreen);
 
         //进入全屏
         function requestFullScreen(element) {
@@ -319,6 +338,33 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             } else if (de.webkitCancelFullScreen) {
                 de.webkitCancelFullScreen();
             }
+        }
+
+        function searchUser(userId) {
+            fetch(
+                '{{ url_for("search") }}',
+                {
+                    method: "POST",
+                    body: JSON.stringify({ "match": { "userId": userId } }),
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                }
+            ).then((resp) => {
+                return resp.json()
+            }).then((data) => {
+                if (data.count == 0) {
+                    alert("无数据");
+                } else {
+                    // 设置搜索结果数据
+                    data.query = { "userId": userId };
+                    data.idx = 1;
+                    sessionStorage.illusts = JSON.stringify(data);
+                    // 跳转到新页面
+                    location.reload();
+                }
+            });
+
         }
     </script>
 </body>

@@ -17,7 +17,7 @@
         <textarea name="match" form="mainForm">{}</textarea>
         <br>
         <label for="pageIdx">Init Page Index</label>
-        <input id="pageIdx" name="idx" type="number" value="0" />
+        <input id="pageIdx" name="idx" type="number" value="1" />
         <br>
         <input type="submit">
     </form>
@@ -34,35 +34,37 @@
         function checkForm(doFetch = false) {
             var text = match.value;
             try {
-                var json = JSON.parse(text);
+                var jsonData = JSON.parse(text);
+                historyInputs[text] = new Date();
+                localStorage.setItem('history', JSON.stringify(historyInputs));
+                setOptions();
+                if (doFetch) {
+                    console.log("FETCH")
+                    fetch(
+                        '{{ url_for("search") }}',
+                        {
+                            method: "POST",
+                            body: JSON.stringify({ "match": jsonData }),
+                            headers: {
+                                "Content-Type": "application/json"
+                            }
+                        }).then((resp) => {
+                            return resp.json()
+                        }).then((data) => {
+                            if (data.count == 0) {
+                                alert("无数据");
+                            } else {
+                                // 设置搜索结果数据
+                                data.query = jsonData;
+                                data.idx = document.getElementById("pageIdx").value;
+                                sessionStorage.illusts = JSON.stringify(data);
+                                // 跳转到新页面
+                                location.pathname = "{{ url_for('illust') }}";
+                            }
+                        })
+                }
             } catch (err) {
                 alert(err)
-                return false;
-            }
-            historyInputs[text] = new Date();
-            localStorage.setItem('history', JSON.stringify(historyInputs));
-            setOptions();
-            if (doFetch) {
-                console.log("FETCH")
-                fetch(
-                    '{{ url_for("search") }}',
-                    {
-                        method: "POST",
-                        body: new FormData(document.getElementById('mainForm'))
-                    }).then((resp) => {
-                        return resp.json()
-                    }).then((data) => {
-                        if (data.count == 0) {
-                            alert("无数据");
-                        } else {
-                            // 设置搜索结果数据
-                            data.query = document.getElementsByName("match")[0].value;
-                            data.idx = document.getElementById("pageIdx").value;
-                            sessionStorage.illusts = JSON.stringify(data);
-                            // 跳转到新页面
-                            location.pathname = "{{ url_for('illust') }}";
-                        }
-                    })
             }
             return false;
         }

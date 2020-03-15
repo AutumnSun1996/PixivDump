@@ -86,7 +86,7 @@ def mongo_file(file):
             ratio = 1280 / img.shape[1]
             img = cv.resize(img, (0, 0), fx=ratio, fy=ratio)
         _, res = cv.imencode(".jpg", img, [int(cv.IMWRITE_JPEG_QUALITY), 70])
-        print("压缩: %d -> %d", len(data), len(res))
+        logger.info("压缩: %d -> %d", len(data), len(res))
         data = res.tobytes()
 
     resp = Response(data, mimetype=mimetype)
@@ -104,6 +104,7 @@ def image(illust_id, idx):
     f = fs.find_one(cond)
     if f is None:
         # 添加下载任务
+        logger.info("添加下载任务 download_illust %s", illust_id)
         dump.download_illust(db.illust.find_one({"illustId": illust_id}))
         return "illust not found", 404
     return mongo_file(f)
@@ -115,6 +116,7 @@ def zip_image(illust_id):
     f = fs.find_one(cond)
     if f is None:
         # 添加下载任务
+        logger.info("添加下载任务 download_ugoira %s", illust_id)
         dump.download_ugoira(db.illust.find_one({"illustId": illust_id}))
         return "ZipFile not found", 404
     return mongo_file(f)
@@ -123,8 +125,8 @@ def zip_image(illust_id):
 @app.route("/pixiv/search", methods=["POST"])
 def search():
     try:
-        match = json.loads(request.values.get("match"))
-        limit = int(request.values.get("limit", 100))
+        match = request.json["match"]
+        limit = request.json.get("limit", 100)
     except Exception as e:
         return "Invalid param: " + str(e), 400
     if "$and" in match:
@@ -146,9 +148,12 @@ def illust():
 
 
 if __name__ == "__main__":
+    
     if app_debug:
+        logging.basicConfig(level="DEBUG")
         app.run(app_host, app_port, debug=True)
     else:
+        logging.basicConfig(level="INFO")
         from gevent.pywsgi import WSGIServer
 
         http_server = WSGIServer((app_host, app_port), app, log=logger)
