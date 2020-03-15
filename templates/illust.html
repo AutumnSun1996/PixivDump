@@ -23,9 +23,12 @@
     </head>
     <body>
         <div id="illust-header"></div>
+        <button onclick="previous()">上一个</button><button onclick="next()">下一个</button>
+        <input type="number" name="pageIndex" id="pageIndex">
+        <button onclick="gotoPage()">GO</button>
         <div class="display" id="illust-display"></div>
         <div class="display">
-        <button onclick="previous()">上一个</button><button onclick="next()">下一个</button>
+            <button onclick="goTop()">TOP</button>
         </div>
         <script>
             var illustIds = {{ illust|safe }};
@@ -46,7 +49,7 @@
                  }
 
                 out.innerHTML = `
-<h2>${idx+1}.<a href="https://www.pixiv.net/artworks/${illust.illustId}" target="_blank">${illust.illustTitle}</a></h2>
+<h2 id="name${idx}">${idx+1}.<a href="https://www.pixiv.net/artworks/${illust.illustId}" target="_blank">${illust.illustTitle}</a></h2>
 (pid=${illust.illustId},uid=${illust.userId},type=${illust.illustType}) <br>
 <a href='/pixiv/'>Home</a><br>
 <a href='/pixiv/user/${illust.userId}'>${illust.userName}</a>
@@ -58,7 +61,7 @@ ${tagHtml}
 <br>
 size=${illust.width}x${illust.height}<br>
 ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail.likeCount} likes;<br>
-<br><button onclick="previous()">上一个</button><button onclick="next()">下一个</button><br>`;
+`;
             }
             function showIllust(illust, out){
                 for(var i=0; i < illust.pageCount; ++i){
@@ -178,6 +181,9 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             }
             
             function loadIllust(){
+                document.getElementById("pageIndex").value = idx;
+                location.hash = "#name"+idx;
+
                 var header = document.getElementById("illust-header");
                 var display = document.getElementById("illust-display");
                 header.innerHTML = 'Loading';
@@ -188,6 +194,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                     return
                 }
                 addHeader(illust, header);
+                goTop();
                 showIllust(illust, display);
                 if(illust.illustType == 2 && !!illust.frameInfo.frames){
                     showAnime(illust, display);
@@ -201,6 +208,13 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
             function previous(){
                 idx --;
                 loadIllust();
+            }
+            function gotoPage(){
+                idx = document.getElementById("pageIndex").value;
+                loadIllust();
+            }
+            function goTop(){
+                window.scrollTo(0, 0);
             }
             
             var touch = function (){
