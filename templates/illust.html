@@ -226,11 +226,11 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
         }
         loadIllust();
         function next() {
-            idx++;
+            idx = parseInt(idx) + 1;
             loadIllust();
         }
         function previous() {
-            idx--;
+            idx = parseInt(idx) - 1;
             loadIllust();
         }
         function gotoPage() {
@@ -277,7 +277,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                 var direction = touch.pageX > startX ? -1 : 1;  // 向右滑 -> 上一页; 向左滑 -> 下一页;
                 console.log("END", direction, deltaX, deltaT, speed);
                 if (speed > speedTresh || deltaX > widthThresh) {
-                    idx = idx + direction;
+                    idx = parseInt(idx) + direction;
                     loadIllust();
                 }
             });
