@@ -86,7 +86,7 @@ def mongo_file(file):
             ratio = 1280 / img.shape[1]
             img = cv.resize(img, (0, 0), fx=ratio, fy=ratio)
         _, res = cv.imencode(".jpg", img, [int(cv.IMWRITE_JPEG_QUALITY), 70])
-        logger.info("压缩: %d -> %d", len(data), len(res))
+        logger.info("压缩%s: %d -> %d", file.filename, len(data), len(res))
         data = res.tobytes()
 
     resp = Response(data, mimetype=mimetype)
@@ -134,7 +134,7 @@ def search():
     else:
         match = {"$and": [match, {"detail.error": {"$exists": 0}}]}
     result = list(
-        db.illust.find(match, {"_id": 0, "frameInfo.file": 0},)
+        db.illust.find(match, {"_id": 0, "frameInfo.file": 0, "files": 0},)
         .sort([("bookmarkCount", -1)])
         .limit(limit)
     )
@@ -148,12 +148,12 @@ def illust():
 
 
 if __name__ == "__main__":
-    
+
     if app_debug:
-        logging.basicConfig(level="DEBUG")
+        # logging.basicConfig(level="DEBUG")
         app.run(app_host, app_port, debug=True)
     else:
-        logging.basicConfig(level="INFO")
+        # logging.basicConfig(level="INFO")
         from gevent.pywsgi import WSGIServer
 
         http_server = WSGIServer((app_host, app_port), app, log=logger)
