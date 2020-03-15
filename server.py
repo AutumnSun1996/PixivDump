@@ -27,7 +27,7 @@ import dump
 
 app_host = "0.0.0.0"
 app_port = 10101
-app_debug = False
+app_debug = True
 
 if not app_debug:
     from gevent import monkey
@@ -104,7 +104,7 @@ def image(illust_id, idx):
     f = fs.find_one(cond)
     if f is None:
         # 添加下载任务
-        dump.download_illust(db.illust.find_one({"illustId": pid}))
+        dump.download_illust(db.illust.find_one({"illustId": illust_id}))
         return "illust not found", 404
     return mongo_file(f)
 
@@ -115,12 +115,12 @@ def zip_image(illust_id):
     f = fs.find_one(cond)
     if f is None:
         # 添加下载任务
-        dump.download_ugoira(db.illust.find_one({"illustId": pid}))
+        dump.download_ugoira(db.illust.find_one({"illustId": illust_id}))
         return "ZipFile not found", 404
     return mongo_file(f)
 
 
-@app.route("/pixiv/search")
+@app.route("/pixiv/search", methods=["POST"])
 def search():
     try:
         match = json.loads(request.values.get("match"))
@@ -130,32 +130,19 @@ def search():
     if "$and" in match:
         match["$and"] += [{"detail.error": {"$exists": 0}}]
     else:
-        match["detail.error"] = {"$exists": 0}
+        match = {"$and": [match, {"detail.error": {"$exists": 0}}]}
     result = list(
-        db.illust.find(match, {"_id": 0,}).sort([("bookmarkCount", -1)]).limit(limit)
+        db.illust.find(match, {"_id": 0, "frameInfo.file": 0},)
+        .sort([("bookmarkCount", -1)])
+        .limit(limit)
     )
-    return jsonify(result)
-
-
-@app.route("/pixiv/user/<uid>")
-def user_redirect(uid):
-    return redirect(url_for("illust", match=to_json({"userId": uid})))
+    count = len(result)
+    return jsonify({"data": result, "count": count})
 
 
 @app.route("/pixiv/illust")
 def illust():
-    try:
-        match = json.loads(request.values.get("match"))
-        limit = int(request.values.get("limit", 100))
-        idx = int(request.values.get("idx", 0))
-    except Exception as e:
-        return "Invalid param: " + str(e), 400
-    result = list(
-        db.illust.find(match, {"_id": 0}).sort([("bookmarkCount", -1)]).limit(limit)
-    )
-    return render_template(
-        "illust.html", illust=to_json(result), idx=idx, count=len(result)
-    )
+    return render_template("illust.html")
 
 
 if __name__ == "__main__":

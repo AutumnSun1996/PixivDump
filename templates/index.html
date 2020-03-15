@@ -1,73 +1,98 @@
 <html>
-    <head>
-        <meta charset="UTF-8"/>
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <title>Local Pixiv Viewer</title>
-        <style>
-            textarea {
-                width: 100%;
-                height: 40%;
-            }
-        </style>
-    </head>
-    <body>
-        <form id="mainForm" action="illust" onsubmit="return checkForm();">
-            <textarea name="match" form="mainForm">{}</textarea>
-            <br>
-            <label for="idx">Init Page Index</label>
-            <input name="idx" type="number" value="0"/>
-            <br>
-            <input type="submit">
-        </form>
-        <select id="history" onchange="updateInput()">
-        </select>
-        <br>
-        <button onclick="checkForm()">添加</button>
-        <button onclick="delHistory()">删除</button>
-        <script>
-            var match = document.getElementsByName("match")[0];
-            var select = document.getElementById("history");
-            var historyInputs = JSON.parse(localStorage.getItem('history') || '{}');
 
-            function checkForm(){
-                var text = match.value;
-                try {
-                    var json = JSON.parse(text);
-                } catch(err) {
-                   alert(err)
-                   return false; 
-                }
-                historyInputs[text] = new Date();
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Local Pixiv Viewer</title>
+    <style>
+        textarea {
+            width: 100%;
+            height: 40%;
+        }
+    </style>
+</head>
+
+<body>
+    <form id="mainForm" action="#search" onsubmit="return checkForm(true);">
+        <textarea name="match" form="mainForm">{}</textarea>
+        <br>
+        <label for="pageIdx">Init Page Index</label>
+        <input id="pageIdx" name="idx" type="number" value="0" />
+        <br>
+        <input type="submit">
+    </form>
+    <select id="history" onchange="updateInput()">
+    </select>
+    <br>
+    <button onclick="checkForm()">添加</button>
+    <button onclick="delHistory()">删除</button>
+    <script>
+        var match = document.getElementsByName("match")[0];
+        var select = document.getElementById("history");
+        var historyInputs = JSON.parse(localStorage.getItem('history') || '{}');
+
+        function checkForm(doFetch = false) {
+            var text = match.value;
+            try {
+                var json = JSON.parse(text);
+            } catch (err) {
+                alert(err)
+                return false;
+            }
+            historyInputs[text] = new Date();
+            localStorage.setItem('history', JSON.stringify(historyInputs));
+            setOptions();
+            if (doFetch) {
+                console.log("FETCH")
+                fetch(
+                    '{{ url_for("search") }}',
+                    {
+                        method: "POST",
+                        body: new FormData(document.getElementById('mainForm'))
+                    }).then((resp) => {
+                        return resp.json()
+                    }).then((data) => {
+                        if (data.count == 0) {
+                            alert("无数据");
+                        } else {
+                            // 设置搜索结果数据
+                            data.query = document.getElementsByName("match")[0].value;
+                            data.idx = document.getElementById("pageIdx").value;
+                            sessionStorage.illusts = JSON.stringify(data);
+                            // 跳转到新页面
+                            location.pathname = "{{ url_for('illust') }}";
+                        }
+                    })
+            }
+            return false;
+        }
+        function setOptions() {
+            select.innerHTML = '';
+            var items = []
+            for (var text in historyInputs) {
+                items.push([historyInputs[text], text])
+            }
+            for (var item of items.sort().reverse()) {
+                var option = document.createElement("option");
+                option.key = item[1];
+                option.innerText = item[1];
+                select.appendChild(option);
+            }
+        }
+        function updateInput() {
+            match.value = select.selectedOptions[0].key;
+        }
+        function delHistory() {
+            var value = select.selectedOptions[0].key;
+            if (!!historyInputs[value]) {
+                delete historyInputs[value];
                 localStorage.setItem('history', JSON.stringify(historyInputs));
                 setOptions();
-                return true;
             }
-            function setOptions(){
-                select.innerHTML = '';
-                var items = []
-                for(var text in historyInputs){
-                    items.push([historyInputs[text], text])
-                }
-                for(var item of items.sort().reverse()){
-                    var option = document.createElement("option");
-                    option.key = item[1];
-                    option.innerText = item[1];
-                    select.appendChild(option);
-                }
-            }
-            function updateInput(){
-                match.value = select.selectedOptions[0].key;
-            }
-            function delHistory(){
-                var value = select.selectedOptions[0].key;
-                if(!!historyInputs[value]){
-                    delete historyInputs[value];
-                    localStorage.setItem('history', JSON.stringify(historyInputs));
-                    setOptions();
-                }
-            }
-            setOptions();
-            updateInput();
-        </script>
-    </body>
+        }
+        setOptions();
+        updateInput();
+    </script>
+</body>
+
 </html>
