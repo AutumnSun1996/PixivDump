@@ -186,17 +186,21 @@ def update_ugoira_meta(response, pid, *args, **kwargs):
             "update_ugoira_meta failed for %s(%s): %s", pid, response.url, e
         )
 
+def check_response(response):
+    if response.status_code != 200:
+        raise Exception("HTTP %d" % response.status_code)
+    data = response.content
+    if not data or (len(data) < 1000 and data.startswith((b"<html>", b'<HTML>', b'\n<html>'))):
+        raise Exception("Invalid Response: %r" % data)
 
 def save_illust(response, pid, index, **kwargs):
     """保存文件"""
     try:
-        if response.status_code != 200:
-            raise Exception("HTTP %d" % response.status_code)
-
         logger.debug("save_illust for %s start", pid)
+        check_response(response)
         info = {"illustId": pid, "pageIndex": index, "fileType": "illust"}
         url = response.url
-
+        
         if fs.exists(filename=url):
             file_id = fs.get_last_version(filename=url)._id
             logger.warning("skip existing file: %s(%s)", pid, url)
@@ -222,6 +226,8 @@ def save_illust(response, pid, index, **kwargs):
 def save_file(response, pid, **kwargs):
     """保存文件"""
     try:
+        check_response(response)
+
         logger.debug("save_file for %s start", pid)
         info = {"illustId": pid, "fileType": "frames"}
         url = response.url
@@ -243,7 +249,7 @@ def save_file(response, pid, **kwargs):
 
 
 def count_local_illust(params):
-    compare_cond = [{"detail.error": {"$exists": 0}}]
+    compare_cond = [{"detail.error.error": {"$exists": 0}}]
     if params.get("s_mode") is None:
         compare_cond += [{"tags": {"$regex": params["word"]}}]
     elif params["s_mode"] == "s_tag_full":
