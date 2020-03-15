@@ -39,9 +39,8 @@
     <script>
         var illusts = JSON.parse(sessionStorage.illusts);
         var idx = illusts.idx || 1;
-        var hashIdx = /name(\d+)$/.exec(location.hash);
-        if (hashIdx) {
-            idx = parseInt(hashIdx[1]);
+        if (history.state && history.state.idx) {
+            idx = history.state.idx;
         }
         var count = illusts.count;
         function addHeader(illust, out) {
@@ -200,7 +199,8 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                 idx = illusts.count;
             }
             document.getElementById("pageIndex").value = idx;
-            location.hash = "#name" + idx;
+            history.replaceState({idx: idx}, null, location.href);
+            // location.hash = "#name" + idx;
 
             var header = document.getElementById("illust-header");
             var control = document.getElementById("illust-control");
