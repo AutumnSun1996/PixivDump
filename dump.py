@@ -4,6 +4,7 @@ import math
 import json
 import datetime
 from urllib.parse import quote_plus
+from functools import partial
 
 import pymongo
 import gridfs
@@ -23,17 +24,6 @@ session = FuturesSession(adapter_kwargs={"max_retries": 3})
 task_statistics = {"total": 0, "done": 0, "success": 0}
 
 
-def extra_args(func, *extra_args, **extra_kwargs):
-    """为待调用的函数添加额外参数"""
-
-    def new_func(*args, **kwargs):
-        args = extra_args + args
-        extra_kwargs.update(kwargs)
-        return func(*args, **extra_kwargs)
-
-    return new_func
-
-
 def update_result(r, target, *args, **kwargs):
     if not hasattr(r, "handler_error"):
         return
@@ -45,7 +35,7 @@ def update_result(r, target, *args, **kwargs):
 def send_request(method, url, **kwargs):
     target = task_statistics  # make a ref of task_statistics, in case it reset between the exec of following two lines
     target["total"] += 1
-    hook_func = extra_args(update_result, target=target)
+    hook_func = partial(update_result, target=target)
     # update hooks, set 'update_result' as the last hook
     if "hooks" not in kwargs:
         kwargs["hooks"] = {}
@@ -364,7 +354,7 @@ def crawl_detail_by_id(illust_id):
         timeout=config.TIMEOUT,
         verify=False,
         headers=header,
-        hooks={"response": extra_args(update_detail, pid=illust_id),},
+        hooks={"response": partial(update_detail, pid=illust_id),},
     )
     logger.debug("start crawl_detail for %s", illust_id)
     return r
@@ -415,7 +405,7 @@ def crawl_anime_info():
             timeout=config.TIMEOUT,
             verify=False,
             headers=header,
-            hooks={"response": extra_args(update_ugoira_meta, pid=pid),},
+            hooks={"response": partial(update_ugoira_meta, pid=pid),},
         )
         logger.debug("start crawl_anime_info for %s", pid)
 
@@ -449,7 +439,7 @@ def download_illust(p):
             timeout=config.TIMEOUT,
             verify=False,
             headers=hds,
-            hooks={"response": extra_args(save_illust, pid=p["illustId"], index=i),},
+            hooks={"response": partial(save_illust, pid=p["illustId"], index=i),},
         )
         logger.debug("start download_illust at %s", url)
 
@@ -469,7 +459,7 @@ def download_ugoira(p):
             "Referer": "https://www.pixiv.net/artworks/" + p["illustId"],
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.90",
         },
-        hooks={"response": extra_args(save_file, pid=p["illustId"]),},
+        hooks={"response": partial(save_file, pid=p["illustId"]),},
     )
     logger.debug("start download_ugoira at %s", url)
 
