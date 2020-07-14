@@ -27,7 +27,7 @@ import dump
 
 app_host = "0.0.0.0"
 app_port = 10101
-app_debug = True
+app_debug = False
 
 if not app_debug:
     from gevent import monkey
