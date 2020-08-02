@@ -85,7 +85,7 @@
                                 // 设置搜索结果数据
                                 data.query = jsonData;
                                 data.idx = document.getElementById("pageIdx").value;
-                                sessionStorage.illusts = JSON.stringify(data);
+                                localStorage.illusts = JSON.stringify(data);
                                 popup.style.display = 'none';
                                 // 跳转到新页面
                                 location.pathname = "{{ url_for('illust') }}";

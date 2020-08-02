@@ -37,7 +37,7 @@
         <button onclick="goTop()">TOP</button>
     </div>
     <script>
-        var illusts = JSON.parse(sessionStorage.illusts);
+        var illusts = JSON.parse(localStorage.illusts);
         var idx = illusts.idx || 1;
         if (history.state && history.state.idx) {
             idx = history.state.idx;
@@ -359,7 +359,7 @@ ${illust.detail.viewCount} views; ${illust.bookmarkCount} marks; ${illust.detail
                     // 设置搜索结果数据
                     data.query = { "userId": userId };
                     data.idx = 1;
-                    sessionStorage.illusts = JSON.stringify(data);
+                    localStorage.illusts = JSON.stringify(data);
                     // 跳转到新页面
                     location.reload();
                 }
